@@ -1,0 +1,39 @@
+{
+  "name": "siyuan-plugin-wehchat-sync",
+  "logo": "icon.png",
+  "author": "onemorework",
+  "url": "https://github.com/onemorework/SiyuanWechatSync",
+  "version": "0.1.0",
+  "minAppVersion": "2.10.13",
+  "displayName": {
+    "default": "Wechat Sync Plugin",
+    "zh_CN": "微信同步插件"
+  },
+  "description": {
+    "default": "A plugin to sync data with external server",
+    "zh_CN": "一个用于与外部服务器同步数据的插件"
+  },
+  "readme": {
+    "default": "README.md",
+    "zh_CN": "README_zh_CN.md"
+  },
+  "funding": {
+    "openCollective": "",
+    "patreon": "",
+    "github": "",
+    "custom": [
+      ""
+    ]
+  },
+  "type": "commonjs",
+  "i18n": [
+    "en_US",
+    "zh_CN"
+  ],
+  "options": {
+    "settingPath": "setting.json"
+  },
+  "style": {
+    "index.css": "./style/index.css"
+  }
+}

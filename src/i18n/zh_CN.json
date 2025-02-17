@@ -1,0 +1,31 @@
+{
+    "pluginName": "自定义同步插件",
+    "pluginDesc": "一个用于与外部服务器同步数据的插件",
+    "settings": {
+        "serverUrl": "服务器地址",
+        "serverUrlDesc": "同步服务器的地址",
+        "token": "Token",
+        "tokenDesc": "访问令牌",
+        "syncInterval": "同步周期（秒）",
+        "syncIntervalDesc": "自动同步的时间间隔（0表示不自动同步）",
+        "selectNotebook": "选择笔记本",
+        "selectNotebookDesc": "选择要同步的笔记本",
+        "selectDoc": "选择文档",
+        "selectDocDesc": "选择要同步的文档",
+        "syncOnLoad": "加载时同步",
+        "syncOnLoadDesc": "插件加载时立即同步一次数据",
+        "pleaseSelect": "请选择",
+        "pleaseSelectNotebook": "请选择笔记本",
+        "pleaseSelectDoc": "请选择文档"
+    },
+    "messages": {
+        "syncSuccess": "同步成功",
+        "syncFailed": "同步失败",
+        "pleaseSelectNotebookAndDoc": "请先选择笔记本和文档",
+        "writeFailed": "写入文档失败"
+    },
+    "buttons": {
+        "syncNow": "立即同步",
+        "save": "保存"
+    }
+}

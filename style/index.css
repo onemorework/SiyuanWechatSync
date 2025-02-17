@@ -1,0 +1,45 @@
+.tree-select {
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid var(--b3-border-color);
+    padding: 8px;
+    background-color: var(--b3-theme-background);
+}
+
+.tree-item {
+    padding: 4px 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    border-radius: 4px;
+}
+
+.tree-item:hover {
+    background-color: var(--b3-theme-background-light);
+}
+
+.tree-item.selected {
+    background-color: var(--b3-theme-primary-light);
+}
+
+.tree-toggle {
+    margin-right: 8px;
+    cursor: pointer;
+    width: 16px;
+    text-align: center;
+    color: var(--b3-theme-on-surface);
+    font-size: 12px;
+}
+
+.tree-children {
+    margin-left: 24px;
+    border-left: 1px solid var(--b3-border-color);
+    padding-left: 4px;
+}
+
+.tree-title {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+} 

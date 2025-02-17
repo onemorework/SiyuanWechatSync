@@ -1,0 +1,31 @@
+{
+    "pluginName": "Custom Sync Plugin",
+    "pluginDesc": "A plugin to sync data with external server",
+    "settings": {
+        "serverUrl": "Server URL",
+        "serverUrlDesc": "The address of sync server",
+        "token": "Token",
+        "tokenDesc": "Access token",
+        "syncInterval": "Sync Interval (seconds)",
+        "syncIntervalDesc": "Auto sync interval (0 means no auto sync)",
+        "selectNotebook": "Select Notebook",
+        "selectNotebookDesc": "Select notebook to sync",
+        "selectDoc": "Select Document",
+        "selectDocDesc": "Select document to sync",
+        "syncOnLoad": "Sync on Load",
+        "syncOnLoadDesc": "Sync data immediately when plugin loads",
+        "pleaseSelect": "Please select",
+        "pleaseSelectNotebook": "Please select notebook",
+        "pleaseSelectDoc": "Please select document"
+    },
+    "messages": {
+        "syncSuccess": "Sync successful",
+        "syncFailed": "Sync failed",
+        "pleaseSelectNotebookAndDoc": "Please select notebook and document first",
+        "writeFailed": "Failed to write document"
+    },
+    "buttons": {
+        "syncNow": "Sync Now",
+        "save": "Save"
+    }
+}
