@@ -1,48 +1,75 @@
-Siyuan Note WeChat Sync Plugin
-A plugin for syncing and saving the content from WeChat official accounts (Cloud Note Assistant) to Siyuan Note.
-Privacy and Security Statement
-Due to the current mechanism of WeChat official accounts, all messages can be viewed in the official account background. We promise not to actively view any information and will regularly delete user conversation data. However, for your privacy and security, please do not send sensitive data.
-Feature Highlights
-Supports automatically syncing note content from the Cloud Note Assistant official account.
-Allows setting the automatic sync time interval.
-Enables selection of the target notebook and document for syncing.
-Supports automatic syncing when the plugin is loaded.
-Allows manual triggering of syncing.
-Usage Instructions
-1. Obtain the Binding Key
-Follow the "Cloud Note Assistant" WeChat official account.
-Send "!Bind" in the official account to get the binding key.
-2. Configure the Plugin
-Install this plugin in Siyuan Note.
-Click the plugin icon in the top bar to open the settings interface.
-In the settings interface:
-Enter your binding key (Token).
-Select the notebook to sync to.
-Select the document to sync to.
-Set the sync period (optional, 0 means no automatic sync).
-Set whether to automatically sync when the plugin is loaded.
-3. Start Using
-Send the content you want to save in the Cloud Note Assistant official account.
-The content will be automatically synced to Siyuan Note according to your settings.
-You can also click the sync icon in the top bar to manually trigger the sync.
-Precautions
-Currently, the daily note sending limit for each user is 5.
-Please keep your binding key safe and do not share it with others.
-The sync function requires Siyuan Note to be kept open.
-It is recommended to select a dedicated document for syncing to avoid mixing with other content.
-If you encounter sync problems, you can try:
-Check if the binding key is correct.
-Confirm that the network connection is normal.
-Re - select the target notebook and document.
-Restart Siyuan Note.
-Update Log
-Please refer to CHANGELOG.md
-Feedback
-If you encounter any problems or have any suggestions during the use, you are welcome to provide feedback through the following methods:
-Submit an Issue on GitHub.
-Provide feedback on the Siyuan Note forum.
-Provide feedback through the Cloud Note Assistant official account.
-Open - Source License
-This plugin is open - sourced under the LGPL license.
-Acknowledgments
-Thank you for using this plugin! At the same time, thanks to Siyuan Note for providing an excellent note - taking platform.
+# 思源笔记微信同步插件
+
+[English](./README_en_US.md)
+
+一个用于将微信公众号（云笔记助手）的内容同步保存到思源笔记的插件。
+
+<img src="./asset/wechat_qr.png" alt="weichat" width="300"/>
+
+## 隐私安全说明
+
+**由于当前微信公众号的机制，所有消息在公众号后台均可查阅，我们承诺不会主动浏览任何信息并会定期删除用户对话数据，但为了您的隐私安全，请勿发送敏感数据。**
+
+## 功能特点
+
+* 支持从云笔记助手公众号自动同步笔记内容
+* 支持设置自动同步时间间隔
+* 支持选择同步目标笔记本和文档
+* 支持插件加载时自动同步
+* 支持手动触发同步
+
+## 使用说明
+
+### 1. 获取绑定密钥
+
+1. 关注"云笔记助手"微信公众号
+2. 在公众号中发送"!绑定"获取绑定密钥
+
+### 2. 配置插件
+
+1. 在思源笔记中安装本插件
+2. 点击顶栏插件图标，打开设置界面
+3. 在设置界面中：
+   - 输入你的绑定密钥（Token）
+   - 选择要同步到的笔记本
+   - 选择要同步到的文档
+   - 设置同步周期（可选，0表示不自动同步）
+   - 设置是否在插件加载时自动同步
+
+### 3. 开始使用
+
+1. 在云笔记助手公众号发送你想要保存的内容
+2. 内容会根据你的设置自动同步到思源笔记中
+3. 你也可以点击顶栏的同步图标手动触发同步
+
+## 注意事项
+
+1. 当前用户每日发送的笔记上限为 5 条
+2. 请妥善保管你的绑定密钥，不要分享给他人
+3. 同步功能需要保持思源笔记处于打开状态
+4. 建议选择专门的文档用于同步，避免与其他内容混合
+5. 如果遇到同步问题，可以尝试：
+   - 检查绑定密钥是否正确
+   - 确认网络连接是否正常
+   - 重新选择目标笔记本和文档
+   - 重启思源笔记
+
+## 更新日志
+
+请查看 [CHANGELOG.md](./CHANGELOG.md)
+
+## 反馈问题
+
+如果你在使用过程中遇到任何问题，或有任何建议，欢迎通过以下方式反馈：
+
+1. 在 GitHub 上提交 Issue
+2. 在思源笔记论坛中反馈
+3. 通过云笔记助手公众号反馈
+
+## 开源协议
+
+本插件采用 [LGPL-3.0](./LICENSE) 协议开源。
+
+## 致谢
+
+感谢使用本插件！同时感谢思源笔记提供的优秀的笔记平台。
