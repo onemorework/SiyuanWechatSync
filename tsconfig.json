@@ -50,10 +50,5 @@
         "src/**/*.vue",
         "src/**/*.svelte"
     ],
-    "references": [
-        {
-            "path": "./tsconfig.node.json"
-        }
-    ],
     "root": "."
 }

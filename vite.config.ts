@@ -6,7 +6,6 @@ import { svelte } from "@sveltejs/vite-plugin-svelte"
 import zipPack from "vite-plugin-zip-pack";
 import fg from 'fast-glob';
 
-import vitePluginYamlI18n from './yaml-plugin';
 
 const env = process.env;
 const isSrcmap = env.VITE_SOURCEMAP === 'inline';
@@ -28,10 +27,6 @@ export default defineConfig({
     plugins: [
         svelte(),
 
-        vitePluginYamlI18n({
-            inDir: 'public/i18n',
-            outDir: `${outputDir}/i18n`
-        }),
 
         viteStaticCopy({
             targets: [
