@@ -1,6 +1,7 @@
-import { Plugin, showMessage, fetchPost,  } from "siyuan";
+import { Plugin, showMessage, fetchPost } from "siyuan";
 import { ICONS } from './icons';
 import { SettingUtils } from "./libs/setting-utils";
+import { SERVER_BASE_URL } from './config'
 
 export default class SyncPlugin extends Plugin {
     private syncTimer: NodeJS.Timeout;
@@ -93,7 +94,7 @@ export default class SyncPlugin extends Plugin {
                 callback: async () => {
                     const notebookId = this.settingUtils.take("selectedNotebookId", true);
                     const notebookName = (this.settingUtils.getElement("selectedNotebookId") as HTMLSelectElement)?.selectedOptions[0]?.text || "";
-                    
+
                     this.config.selectedNotebookId = notebookId;
                     this.config.selectedNotebookName = notebookName;
                     this.config.selectedDocId = "";
@@ -110,7 +111,7 @@ export default class SyncPlugin extends Plugin {
                             const docOptions = {
                                 "": "请选择文档"
                             };
-                            
+
                             if (Array.isArray(files)) {
                                 files.forEach(doc => {
                                     if (doc.id && doc.name) {
@@ -122,7 +123,7 @@ export default class SyncPlugin extends Plugin {
                             const docItem = this.settingUtils.settings.get("selectedDocId");
                             if (docItem) {
                                 docItem.options = docOptions;
-                                await this.saveData("config.json", this.config); 
+                                await this.saveData("config.json", this.config);
 
                                 const selectElement = this.settingUtils.getElement("selectedDocId") as HTMLSelectElement;
                                 if (selectElement) {
@@ -168,7 +169,7 @@ export default class SyncPlugin extends Plugin {
             const options = {
                 "": "请选择笔记本"
             };
-            
+
             notebooks.forEach((notebook: any) => {
                 if (notebook.id && notebook.name) {
                     options[notebook.id] = notebook.name;
@@ -201,7 +202,7 @@ export default class SyncPlugin extends Plugin {
                         const docOptions = {
                             "": "请选择文档"
                         };
-                        
+
                         files.forEach(doc => {
                             if (doc.id && doc.name) {
                                 docOptions[doc.id] = doc.name;
@@ -211,7 +212,7 @@ export default class SyncPlugin extends Plugin {
                         const docItem = this.settingUtils.settings.get("selectedDocId");
                         if (docItem) {
                             docItem.options = docOptions;
-                            
+
                             const selectElement = this.settingUtils.getElement("selectedDocId") as HTMLSelectElement;
                             if (selectElement) {
                                 selectElement.innerHTML = '';
@@ -268,31 +269,31 @@ export default class SyncPlugin extends Plugin {
                 showMessage("请先选择笔记本和文档");
                 return;
             }
-            
+
             console.log(`开始同步到笔记本 [${this.config.selectedNotebookName}] 的文档 [${this.config.selectedDocName}]`);
-            const response = await fetch("https://sd.cloud.ifbemore.com/api/v1/note/records", {
+            const response = await fetch(`${SERVER_BASE_URL}/api/v1/note/records`, {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${this.config.token}`,
                     'Content-Type': 'application/json'
                 }
             });
-            
+
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
 
             const data = await response.json();
-            
+
             const writtenIds: string[] = [];
             if (Array.isArray(data.data.list) && data.data.list.length > 0) {
-                for (const item of data.data.list) { 
-                    await this.writeDataToDoc(item.createdAt, item.content);
+                for (const item of data.data.list) {
+                    await this.writeDataToDoc(item.createdAt, item.content, item.contentType);
                     writtenIds.push(item.id);
                 }
 
                 // 发送确认请求
-                const confirmResponse = await fetch("https://sd.cloud.ifbemore.com/api/v1/note/records", {
+                const confirmResponse = await fetch(`${SERVER_BASE_URL}/api/v1/note/records`, {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${this.config.token}`,
@@ -307,7 +308,7 @@ export default class SyncPlugin extends Plugin {
                     throw new Error(`确认请求失败: ${confirmResponse.status}`);
                 }
             }
-            if (enable) {   
+            if (enable) {
                 showMessage("同步成功");
             }
         } catch (error) {
@@ -317,28 +318,77 @@ export default class SyncPlugin extends Plugin {
         }
     }
 
-    private async writeDataToDoc(title: any, data: any) {
-        const timeInstance  = new Date(title);
-        const timestamp = timeInstance.getTime(); 
-        console.log(`开始写入文档 [${this.config.selectedDocName}]，时间为 [${timestamp}]`);
-        console.log(`写入数据为 [${data}]`);
+    private async writeDataToDoc(title: any, data: any, contentType: string = 'text') {
+        const timeInstance = new Date(title);
+        const timestamp = timeInstance.getTime();
+        console.log(`开始写入文档 [${this.config.selectedDocName}]，时间为 [${timestamp}]，内容类型为 [${contentType}]`);
 
         const year = timeInstance.getFullYear();
-        const month = String(timeInstance.getMonth() + 1).padStart(2, '0'); 
-        const day = String(timeInstance.getDate()).padStart(2, '0'); 
-        const hours = String(timeInstance.getHours()).padStart(2, '0'); 
-        const minutes = String(timeInstance.getMinutes()).padStart(2, '0'); 
-        // const seconds = String(timeInstance.getSeconds()).padStart(2, '0'); 
-        
+        const month = String(timeInstance.getMonth() + 1).padStart(2, '0');
+        const day = String(timeInstance.getDate()).padStart(2, '0');
+        const hours = String(timeInstance.getHours()).padStart(2, '0');
+        const minutes = String(timeInstance.getMinutes()).padStart(2, '0');
+
         // 拼接成所需的日期字符串格式
         const formattedtitle = `${year}-${month}-${day} ${hours}:${minutes}`;
         console.log(`日期字符串为 [${formattedtitle}]`);
-        // return
+
         try {
-            return new Promise<void>((resolve) => {
+            return new Promise<void>(async (resolve) => {
                 const diifTime = timestamp - this.lastSyncTime
                 console.log(` 时间差： ${diifTime}`)
-                if (this.lastSyncTime == 0 || timestamp - this.lastSyncTime > 300*1000 ) {
+
+                // 处理图片类型内容
+                if (contentType === 'image') {
+                    try {
+                        // 从指定URL下载图片
+                        const imageUrl = `https://test.cloud.ifbemore.com${data}`;
+                        console.log(`下载图片: ${imageUrl}`);
+
+                        const imageResponse = await fetch(
+                            imageUrl,
+                            {
+                                headers: {
+                                    'Authorization': `Bearer ${this.config.token}`,
+                                }
+                            });
+                        if (!imageResponse.ok) {
+                            throw new Error(`下载图片失败: ${imageResponse.status}`);
+                        }
+
+                        // 获取图片数据
+                        const disposition = imageResponse.headers.get('Content-Disposition');
+                        const imageName = disposition.split(';')[1].split('=')[1];
+                        const imageBlob = await imageResponse.blob();
+                        const formData = new FormData();
+                        formData.append('file[]', imageBlob, `${imageName}`);
+
+                        // 上传到思源笔记
+                        const uploadResponse = await fetch('/api/asset/upload', {
+                            method: 'POST',
+                            body: formData
+                        });
+
+                        if (!uploadResponse.ok) {
+                            throw new Error(`上传图片失败: ${uploadResponse.status}`);
+                        }
+
+                        const uploadResult = await uploadResponse.json();
+                        if (uploadResult.code !== 0) {
+                            throw new Error(`上传图片失败: ${uploadResult.msg}`);
+                        }
+
+                        // 获取上传后的资源路径
+                        const assetPath = uploadResult.data.succMap[Object.keys(uploadResult.data.succMap)[0]];
+                        // data = `![image](${assetPath}){: style="width: 30vh"}`;
+                        data = `![image](${assetPath})`;
+                    } catch (error) {
+                        console.error('处理图片失败:', error);
+                        data = `图片处理失败: ${error.message}`;
+                    }
+                }
+
+                if (this.lastSyncTime == 0 || timestamp - this.lastSyncTime > 300 * 1000) {
                     this.lastSyncTime = timestamp;
                     this.saveData("syncTiem.json", this.lastSyncTime).then(() => {
                         console.log(`开始写入文档 [${this.config.selectedDocName}]，最后时间为+++ [${this.lastSyncTime}]`);
@@ -357,7 +407,7 @@ export default class SyncPlugin extends Plugin {
                         });
                     });
 
-                }else{
+                } else {
                     console.log(`开始写入文档 [${this.config.selectedDocName}]，最后时间为=== [${this.lastSyncTime}]`);
                     fetchPost('/api/block/appendBlock', {
                         dataType: "markdown",
