@@ -44,11 +44,12 @@ A plugin to sync content from the WeChat public account (云笔记助手) to Siy
 
 ## Notes
 
-1. The current daily limit for sending notes is 5
-2. Please keep your binding key safe and do not share it with others
-3. The synchronization function requires Siyuan Note to be open
-4. It is recommended to choose a dedicated document for synchronization to avoid mixing with other content
-5. If you encounter synchronization issues, you can try:
+- The current daily limit for sending notes is 5
+- Un-synced data retention period: 30 days
+- Please keep your binding key safe and do not share it with others
+- The synchronization function requires Siyuan Note to be open
+- It is recommended to choose a dedicated document for synchronization to avoid mixing with other content
+- If you encounter synchronization issues, you can try:
   - Checking if the binding key is correct
   - Ensuring the network connection is normal
   - Re-selecting the target notebook and document
@@ -62,9 +63,8 @@ Please check [CHANGELOG.md](./CHANGELOG.md)
 
 If you encounter any problems or have any suggestions during use, please provide feedback through the following ways:
 
-1. Submit an issue on GitHub
-2. Provide feedback in the Siyuan Note forum
-3. Provide feedback through the Cloud Note Assistant public account
+1. Submit an [Issue](https://github.com/onemorework/SiyuanWechatSync/issues) on GitHub
+2. Provide feedback through the Cloud Note Assistant public account by send "!反馈" message
 
 ## License
 
