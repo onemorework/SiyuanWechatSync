@@ -1,11 +1,10 @@
 import { Plugin, showMessage, fetchPost } from "siyuan";
 import { ICONS } from './icons';
 import { SettingUtils } from "./libs/setting-utils";
-import { SERVER_BASE_URL } from './config'
+import { VERSION, SERVER_BASE_URL } from './config'
+import ServerAPI from './apis/server-api';
 
 export default class SyncPlugin extends Plugin {
-    private syncTimer: NodeJS.Timeout;
-    private settingUtils: SettingUtils;
     private config: {
         token: string;
         syncInterval: number;
@@ -15,9 +14,19 @@ export default class SyncPlugin extends Plugin {
         selectedDocName: string;
         syncOnLoad: boolean;
     };
+
+    private syncApi: ServerAPI;
+    private syncTimer: NodeJS.Timeout;
+    private settingUtils: SettingUtils;
     private lastSyncTime: number = 0;
 
+    showMessage = (msg: string) => {
+        showMessage(`微信同步插件[${VERSION}]: ` + msg);
+    }
+
     async onload() {
+        console.log(`Load siyuan weichat sync plugin: [${VERSION}]`);
+
         this.config = await this.loadData("config.json") || {
             token: "",
             syncInterval: 3600,
@@ -27,6 +36,7 @@ export default class SyncPlugin extends Plugin {
             selectedDocName: "",
             syncOnLoad: true
         };
+        this.syncApi = new ServerAPI(this.config.token);
 
         this.settingUtils = new SettingUtils({
             plugin: this,
@@ -59,6 +69,7 @@ export default class SyncPlugin extends Plugin {
                 callback: async () => {
                     const token = this.settingUtils.take("token", true);
                     this.config.token = token;
+                    this.syncApi.updateToken(token);
                     await this.saveData("config.json", this.config);
                 }
             }
@@ -238,82 +249,78 @@ export default class SyncPlugin extends Plugin {
             }
         });
 
-        this.startSyncTimer();
-
         if (this.config.syncOnLoad) {
-            console.log('插件加载，执行初始同步');
+            console.log('start sync on load');
             this.syncData(false);
         }
+
+        this.startSyncTimer();
     }
 
     private startSyncTimer() {
-        // 清除已存在的定时器
         if (this.syncTimer) {
             clearInterval(this.syncTimer);
+            this.syncTimer = null;
         }
 
-        if (this.config.syncInterval > 0) {
-            this.syncTimer = setInterval(() => {
-                this.syncData();
-            }, this.config.syncInterval * 1000);
-        } else {
-            console.log('同步周期设置为0，不启动定时同步');
+        if (this.config.token === "") {
+            console.log("weichat sync token unset, skip timer sync");
+            return;
+        };
+
+        if (this.config.syncInterval <= 0) {
+            console.log('sync interval is 0, skip sync');
+            return
         }
+
+        this.syncTimer = setInterval(() => {
+            this.syncData();
+        }, this.config.syncInterval * 1000);
     }
 
 
     private async syncData(enable: boolean = true) {
+        if (!this.config.token) {
+            console.log("weichat sync token unset");
+            if (enable) {
+                this.showMessage("请先配置 Token");
+            }
+            return;
+        }
+
+        if (!this.config.selectedNotebookId || !this.config.selectedDocId) {
+            console.log("weichat sync selected notebook or doc unset");
+            if (enable) {
+                this.showMessage("请先选择笔记本和文档");
+            }
+            return;
+        }
+
+        console.log("start sync data");
         try {
-            if (!this.config.selectedNotebookId || !this.config.selectedDocId) {
-                showMessage("请先选择笔记本和文档");
+            const records = await this.syncApi.getNoteRecords();
+            if (records.length === 0) {
+                console.log("weichat records is empty");
+                if (enable) {
+                    this.showMessage("所有记录均已同步");
+                }
                 return;
             }
 
             console.log(`开始同步到笔记本 [${this.config.selectedNotebookName}] 的文档 [${this.config.selectedDocName}]`);
-            const response = await fetch(`${SERVER_BASE_URL}/api/v1/note/records`, {
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${this.config.token}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const data = await response.json();
-
             const writtenIds: string[] = [];
-            if (Array.isArray(data.data.list) && data.data.list.length > 0) {
-                for (const item of data.data.list) {
-                    await this.writeDataToDoc(item.createdAt, item.content, item.contentType);
-                    writtenIds.push(item.id);
-                }
-
-                // 发送确认请求
-                const confirmResponse = await fetch(`${SERVER_BASE_URL}/api/v1/note/records`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${this.config.token}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        ids: writtenIds
-                    })
-                });
-
-                if (!confirmResponse.ok) {
-                    throw new Error(`确认请求失败: ${confirmResponse.status}`);
-                }
+            for (const item of records) {
+                await this.writeDataToDoc(item.createdAt, item.content, item.contentType);
+                writtenIds.push(item.id);
             }
-            if (enable) {
-                showMessage("同步成功");
-            }
+
+            // 发送确认请求
+            await this.syncApi.setNotePulled(writtenIds);
+            console.log(`wechat sync complete, write data: ${writtenIds.length}`);
+            this.showMessage(`同步成功, 共获取 ${writtenIds.length} 条记录`);
         } catch (error) {
-            if (enable) {
-                showMessage(`同步失败: ${error.message}`);
-            }
+            console.log(`wechat sync error: ${error}`);
+            this.showMessage(error);
         }
     }
 
@@ -333,90 +340,85 @@ export default class SyncPlugin extends Plugin {
         console.log(`日期字符串为 [${formattedtitle}]`);
 
         try {
-            return new Promise<void>(async (resolve) => {
-                const diifTime = timestamp - this.lastSyncTime
-                console.log(` 时间差： ${diifTime}`)
+            const diifTime = timestamp - this.lastSyncTime
+            console.log(`时间差： ${diifTime}`)
 
-                // 处理图片类型内容
-                if (contentType === 'image') {
-                    try {
-                        // 从指定URL下载图片
-                        const imageUrl = `${SERVER_BASE_URL}${data}`;
-                        console.log(`下载图片: ${imageUrl}`);
+            // 处理图片类型内容
+            if (contentType === 'image') {
+                try {
+                    // 从指定URL下载图片
+                    const imageUrl = `${SERVER_BASE_URL}${data}`;
+                    console.log(`下载图片: ${imageUrl}`);
 
-                        const imageResponse = await fetch(
-                            imageUrl,
-                            {
-                                headers: {
-                                    'Authorization': `Bearer ${this.config.token}`,
-                                }
-                            });
-                        if (!imageResponse.ok) {
-                            throw new Error(`下载图片失败: ${imageResponse.status}`);
-                        }
-
-                        // 获取图片数据
-                        const disposition = imageResponse.headers.get('Content-Disposition');
-                        const imageName = disposition.split(';')[1].split('=')[1];
-                        const imageBlob = await imageResponse.blob();
-                        const formData = new FormData();
-                        formData.append('file[]', imageBlob, `${imageName}`);
-
-                        // 上传到思源笔记
-                        const uploadResponse = await fetch('/api/asset/upload', {
-                            method: 'POST',
-                            body: formData
+                    const imageResponse = await fetch(
+                        imageUrl,
+                        {
+                            headers: {
+                                'Authorization': `Bearer ${this.config.token}`,
+                            }
                         });
-
-                        if (!uploadResponse.ok) {
-                            throw new Error(`上传图片失败: ${uploadResponse.status}`);
-                        }
-
-                        const uploadResult = await uploadResponse.json();
-                        if (uploadResult.code !== 0) {
-                            throw new Error(`上传图片失败: ${uploadResult.msg}`);
-                        }
-
-                        // 获取上传后的资源路径
-                        const assetPath = uploadResult.data.succMap[Object.keys(uploadResult.data.succMap)[0]];
-                        // data = `![image](${assetPath}){: style="width: 30vh"}`;
-                        data = `![image](${assetPath})`;
-                    } catch (error) {
-                        console.error('处理图片失败:', error);
-                        data = `图片处理失败: ${error.message}`;
+                    if (!imageResponse.ok) {
+                        throw new Error(`下载图片失败: ${imageResponse.status}`);
                     }
-                }
 
-                if (this.lastSyncTime == 0 || timestamp - this.lastSyncTime > 300 * 1000) {
-                    this.lastSyncTime = timestamp;
-                    this.saveData("syncTiem.json", this.lastSyncTime).then(() => {
-                        console.log(`开始写入文档 [${this.config.selectedDocName}]，最后时间为+++ [${this.lastSyncTime}]`);
-                        fetchPost('/api/block/appendBlock', {
-                            dataType: "markdown",
-                            data: `## ${formattedtitle}`,
-                            parentID: this.config.selectedDocId
-                        }, () => {
-                            fetchPost('/api/block/appendBlock', {
-                                dataType: "markdown",
-                                data: typeof data === 'string' ? data : JSON.stringify(data, null, 2),
-                                parentID: this.config.selectedDocId
-                            }, () => {
-                                resolve();
-                            });
-                        });
+                    // 获取图片数据
+                    const imageData = await this.syncApi.getImageContent(imageUrl)
+                    const formData = new FormData();
+                    formData.append('file[]', imageData.content, `${imageData.name}`);
+
+                    // 上传到思源笔记
+                    const uploadResponse = await fetch('/api/asset/upload', {
+                        method: 'POST',
+                        body: formData
                     });
 
-                } else {
-                    console.log(`开始写入文档 [${this.config.selectedDocName}]，最后时间为=== [${this.lastSyncTime}]`);
-                    fetchPost('/api/block/appendBlock', {
+                    if (!uploadResponse.ok) {
+                        throw new Error(`上传图片失败: ${uploadResponse.status}`);
+                    }
+
+                    const uploadResult = await uploadResponse.json();
+                    if (uploadResult.code !== 0) {
+                        throw new Error(`上传图片失败: ${uploadResult.msg}`);
+                    }
+
+                    // 获取上传后的资源路径
+                    const assetPath = uploadResult.data.succMap[Object.keys(uploadResult.data.succMap)[0]];
+                    // data = `![image](${assetPath}){: style="width: 30vh"}`;
+                    data = `![image](${assetPath})`;
+                } catch (error) {
+                    console.error('处理图片失败:', error);
+                    data = `图片处理失败: ${error.message}`;
+                }
+            }
+
+            if (this.lastSyncTime == 0 || timestamp - this.lastSyncTime > 300 * 1000) {
+                this.lastSyncTime = timestamp;
+                await this.saveData("syncTiem.json", this.lastSyncTime)
+
+                console.log(`开始写入文档 [${this.config.selectedDocName}]，最后时间为+++ [${this.lastSyncTime}]`);
+                await fetchPost('/api/block/appendBlock',
+                    {
+                        dataType: "markdown",
+                        data: `## ${formattedtitle}`,
+                        parentID: this.config.selectedDocId
+                    }
+                )
+                await fetchPost('/api/block/appendBlock',
+                    {
                         dataType: "markdown",
                         data: typeof data === 'string' ? data : JSON.stringify(data, null, 2),
                         parentID: this.config.selectedDocId
-                    }, () => {
-                        resolve();
-                    });
-                }
-            });
+                    }
+                );
+
+            } else {
+                console.log(`开始写入文档 [${this.config.selectedDocName}]，最后时间为=== [${this.lastSyncTime}]`);
+                await fetchPost('/api/block/appendBlock', {
+                    dataType: "markdown",
+                    data: typeof data === 'string' ? data : JSON.stringify(data, null, 2),
+                    parentID: this.config.selectedDocId
+                })
+            }
         } catch (error) {
             console.error('写入文档失败:', error);
             throw error;
