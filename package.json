@@ -1,12 +1,12 @@
 {
   "name": "siyuan-sync-plugin",
-  "version": "0.3.6",
+  "version": "0.2.1",
   "type": "module",
-  "description": "This is a sample plugin based on vite and svelte for Siyuan (https://b3log.org/siyuan)",
+  "description": "A plugin to sync content from the WeChat public account (云笔记助手) to Siyuan Note.",
   "repository": "",
   "homepage": "",
   "author": "frostime",
-  "license": "MIT",
+  "license": "LGPL-3.0",
   "scripts": {
     "dev": "cross-env NODE_ENV=development VITE_SOURCEMAP=inline vite build --watch",
     "build": "cross-env NODE_ENV=production vite build",

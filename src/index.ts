@@ -7,7 +7,6 @@ export default class SyncPlugin extends Plugin {
     private syncTimer: NodeJS.Timeout;
     private settingUtils: SettingUtils;
     private config: {
-        // serverUrl: string;
         token: string;
         syncInterval: number;
         selectedNotebookId: string;
@@ -342,7 +341,7 @@ export default class SyncPlugin extends Plugin {
                 if (contentType === 'image') {
                     try {
                         // 从指定URL下载图片
-                        const imageUrl = `https://test.cloud.ifbemore.com${data}`;
+                        const imageUrl = `${SERVER_BASE_URL}${data}`;
                         console.log(`下载图片: ${imageUrl}`);
 
                         const imageResponse = await fetch(
