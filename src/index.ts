@@ -1,7 +1,7 @@
 import { Plugin, showMessage, fetchPost } from "siyuan";
 import { ICONS } from './icons';
 import { SettingUtils } from "./libs/setting-utils";
-import { VERSION, SERVER_BASE_URL } from './config'
+import { VERSION } from './config'
 import ServerAPI from './apis/server-api';
 
 export default class SyncPlugin extends Plugin {
@@ -57,7 +57,6 @@ export default class SyncPlugin extends Plugin {
                 }
             }
         });
-
 
         this.settingUtils.addItem({
             key: "token",
@@ -346,23 +345,8 @@ export default class SyncPlugin extends Plugin {
             // 处理图片类型内容
             if (contentType === 'image') {
                 try {
-                    // 从指定URL下载图片
-                    const imageUrl = `${SERVER_BASE_URL}${data}`;
-                    console.log(`下载图片: ${imageUrl}`);
-
-                    const imageResponse = await fetch(
-                        imageUrl,
-                        {
-                            headers: {
-                                'Authorization': `Bearer ${this.config.token}`,
-                            }
-                        });
-                    if (!imageResponse.ok) {
-                        throw new Error(`下载图片失败: ${imageResponse.status}`);
-                    }
-
                     // 获取图片数据
-                    const imageData = await this.syncApi.getImageContent(imageUrl)
+                    const imageData = await this.syncApi.getImageContent(data)
                     const formData = new FormData();
                     formData.append('file[]', imageData.content, `${imageData.name}`);
 
@@ -393,7 +377,7 @@ export default class SyncPlugin extends Plugin {
 
             if (this.lastSyncTime == 0 || timestamp - this.lastSyncTime > 300 * 1000) {
                 this.lastSyncTime = timestamp;
-                await this.saveData("syncTiem.json", this.lastSyncTime)
+                await this.saveData("syncTime.json", this.lastSyncTime)
 
                 console.log(`开始写入文档 [${this.config.selectedDocName}]，最后时间为+++ [${this.lastSyncTime}]`);
                 await fetchPost('/api/block/appendBlock',

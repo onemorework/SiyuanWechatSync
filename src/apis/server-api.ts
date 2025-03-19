@@ -64,7 +64,7 @@ export default class ServerAPI {
 
     try {
       const imageResponse = await fetch(
-        imageUrl,
+        SERVER_BASE_URL + imageUrl,
         {
           headers: {
             'Authorization': `Bearer ${this.token}`,
