@@ -7,9 +7,12 @@ import zipPack from "vite-plugin-zip-pack";
 import fg from 'fast-glob';
 
 
-const env = process.env;
+let env = process.env;
 const isSrcmap = env.VITE_SOURCEMAP === 'inline';
 const isDev = env.NODE_ENV === 'development';
+if (isDev) {
+    env = loadEnv('', process.cwd(), '');
+}
 
 const outputDir = isDev ? "dev" : "dist";
 
@@ -41,7 +44,8 @@ export default defineConfig({
 
     define: {
         "process.env.DEV_MODE": JSON.stringify(isDev),
-        "process.env.NODE_ENV": JSON.stringify(env.NODE_ENV)
+        "process.env.NODE_ENV": JSON.stringify(env.NODE_ENV),
+        "process.env.SERVER_BASE_URL": JSON.stringify(env.SERVER_BASE_URL),
     },
 
     build: {
@@ -109,7 +113,7 @@ export default defineConfig({
  * Clean up some dist files after compiled
  * @author frostime
  * @param options:
- * @returns 
+ * @returns
  */
 function cleanupDistFiles(options: { patterns: string[], distDir: string }) {
     const {
