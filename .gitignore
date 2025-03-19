@@ -3,3 +3,4 @@ dist
 dev
 package.zip
 .DS_Store
+.pnpm-store
