@@ -2,3 +2,6 @@ node_modules
 dist
 dev
 package.zip
+.DS_Store
+.pnpm-store
+.env
