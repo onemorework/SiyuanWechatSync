@@ -395,6 +395,8 @@ export default class SyncPlugin extends Plugin {
                     }
                 );
 
+            } else if (contentType === 'link') {
+                console.log(`开始写入文档 [${this.config.selectedDocName}]}`)
             } else {
                 console.log(`开始写入文档 [${this.config.selectedDocName}]，最后时间为=== [${this.lastSyncTime}]`);
                 await fetchPost('/api/block/appendBlock', {
