@@ -4,6 +4,9 @@ import { SettingUtils } from "./libs/setting-utils";
 import { VERSION } from './config';
 import { Client } from "@siyuan-community/siyuan-sdk";
 import ServerAPI from './apis/server-api';
+import QRCode from 'qrcode';
+
+// declare module 'qrcode';
 
 export default class SyncPlugin extends Plugin {
     private config: {
@@ -14,6 +17,7 @@ export default class SyncPlugin extends Plugin {
         selectedDocId: string;
         selectedDocName: string;
         syncOnLoad: boolean;
+        saltValue: string;
     };
 
     private syClient: Client;
@@ -38,7 +42,8 @@ export default class SyncPlugin extends Plugin {
             selectedNotebookName: "",
             selectedDocId: "",
             selectedDocName: "",
-            syncOnLoad: true
+            syncOnLoad: true,
+            saltValue: ""
         };
         this.syncApi = new ServerAPI(this.config.token);
 
@@ -243,6 +248,51 @@ export default class SyncPlugin extends Plugin {
             }
         });
 
+        this.settingUtils.addItem({
+            key: "saltValue",
+            type: "custom",
+            title: "AES-GCM-256加密盐值",
+            value: this.config.saltValue,
+            description: "加密用的盐值（48位，前16位为iv，后32位为密钥）",
+            createElement: (currentVal) => {
+                const container = document.createElement('div');
+                container.className = 'salt-value-container';
+                container.style.display = 'flex';
+                container.style.alignItems = 'center';
+                container.style.gap = '8px';
+
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.className = 'b3-text-field fn__flex-center fn__size200';
+                input.value = currentVal || '';
+                input.placeholder = '请输入48位盐值';
+                input.style.flex = '1';
+
+                const qrButton = document.createElement('button');
+                qrButton.className = 'b3-button b3-button--outline';
+                qrButton.innerHTML = '生成二维码';
+                qrButton.onclick = () => this.showSaltQRCode(input.value);
+
+                container.appendChild(input);
+                container.appendChild(qrButton);
+
+                return container;
+            },
+            getEleVal: (ele) => {
+                return ele.querySelector('input').value;
+            },
+            setEleVal: (ele, val) => {
+                ele.querySelector('input').value = val;
+            },
+            action: {
+                callback: async () => {
+                    const saltValue = this.settingUtils.take("saltValue", true);
+                    this.config.saltValue = saltValue;
+                    await this.saveData("config.json", this.config);
+                }
+            }
+        });
+
         this.addTopBar({
             icon: ICONS.SYNC,
             title: "立即同步",
@@ -422,6 +472,68 @@ export default class SyncPlugin extends Plugin {
         console.log('插件卸载，清理定时器');
         if (this.syncTimer) {
             clearInterval(this.syncTimer);
+        }
+    }
+
+    private showSaltQRCode(saltValue: string) {
+        if (!saltValue) {
+            this.showMessage("请先输入或生成盐值");
+            return;
+        }
+
+        const dialog = document.createElement('div');
+        dialog.className = 'b3-dialog b3-dialog--open';
+        dialog.innerHTML = `
+            <div class="b3-dialog__scrim"></div>
+            <div class="b3-dialog__container" style="width: 320px; height: 400px">
+                <div class="b3-dialog__header">
+                    <span class="b3-dialog__title">盐值二维码</span>
+                    <button class="b3-button b3-button--text" data-type="close">
+                        <svg class="b3-button__icon"><use xlink:href="#iconClose"></use></svg>
+                    </button>
+                </div>
+                <div class="b3-dialog__content">
+                    <div id="qrcode-container" style="display: flex; justify-content: center; padding: 16px;"></div>
+                    <div style="text-align: center; margin-top: 8px; color: var(--b3-theme-on-surface);">
+                        扫描二维码获取盐值
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(dialog);
+
+        const closeButton = dialog.querySelector('[data-type="close"]');
+        if (closeButton) {
+            closeButton.addEventListener('click', () => {
+                document.body.removeChild(dialog);
+            });
+        }
+
+        const scrim = dialog.querySelector('.b3-dialog__scrim');
+        if (scrim) {
+            scrim.addEventListener('click', () => {
+                document.body.removeChild(dialog);
+            });
+        }
+
+        this.renderSimpleQRCode(saltValue);
+    }
+
+    private renderSimpleQRCode(text: string) {
+        const container = document.getElementById('qrcode-container');
+        if (container) {
+            container.innerHTML = '';
+            QRCode.toCanvas(container, text, {
+                width: 256,
+                margin: 4,
+                color: {
+                    dark: '#000000',
+                    light: '#FFFFFF'
+                }
+            }, (error) => {
+                if (error) console.error(error);
+            });
         }
     }
 }

@@ -21,6 +21,7 @@
     "@sveltejs/vite-plugin-svelte": "^3.1.2",
     "@tsconfig/svelte": "^4.0.1",
     "@types/node": "^20.17.24",
+    "@types/qrcode": "^1.5.5",
     "cross-env": "^7.0.3",
     "fast-glob": "^3.3.3",
     "glob": "^10.4.5",
@@ -39,6 +40,7 @@
   },
   "dependencies": {
     "@siyuan-community/siyuan-sdk": "^0.3.14",
-    "axios": "^1.8.3"
+    "axios": "^1.8.3",
+    "qrcode": "^1.5.4"
   }
 }
