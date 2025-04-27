@@ -86,4 +86,8 @@ export default class ServerAPI {
 
     return data;
   }
+
+  async getLinkContent(noteId: string): Promise<NoteLinkContentRes> {
+    return await this.request.get(`/api/v1/note/links/${noteId}`).then((res) => res.data);
+  }
 }

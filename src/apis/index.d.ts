@@ -22,6 +22,7 @@ interface Request {
 */
 interface NotePushBackendapiNoteV1RecordRes {
   content?: string;
+  contentType?: string;
   createdAt?: string;
   id?: string;
   [property: string]: any;
@@ -30,4 +31,10 @@ interface NotePushBackendapiNoteV1RecordRes {
 interface NoteImageContentRes {
   name: string;
   content: Blob;
+}
+
+interface NoteLinkContentRes {
+  content?: string;
+  title?: string;
+  [property: string]: any;
 }
