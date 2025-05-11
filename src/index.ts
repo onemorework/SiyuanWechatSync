@@ -216,7 +216,6 @@ export default class SyncPlugin extends Plugin {
                             "": "请选择文档"
                         };
 
-                        console.log(docResponse)
                         files.forEach(doc => {
                             if (doc.id && doc.name) {
                                 docOptions[doc.id] = doc.name;
@@ -319,7 +318,7 @@ export default class SyncPlugin extends Plugin {
             }
 
             // 发送确认请求
-            // await this.syncApi.setNotePulled(writtenIds);
+            await this.syncApi.setNotePulled(writtenIds);
             console.log(`wechat sync complete, write data: ${writtenIds.length}`);
             this.showMessage(`同步成功, 共获取 ${writtenIds.length} 条记录`);
         } catch (error) {
@@ -342,34 +341,7 @@ export default class SyncPlugin extends Plugin {
         // 拼接成所需的日期字符串格式
         const formattedtitle = `${year}-${month}-${day} ${hours}:${minutes}`;
         console.log(`日期字符串为 [${formattedtitle}]`);
-        if (note.contentType === 'link') {
-            console.log(`link content [${this.config.selectedDocName}]，内容类型为 [${note.contentType}]`);
-            let content = await this.syncApi.getLinkContent(note.id)
-            console.log("note id:", this.config.selectedDocId);
-            let ret = await this.syClient.getHPathByID({
-               id: this.config.selectedDocId
-            })
-            console.log("gethpath")
-            console.log(ret);
-            const linkcontent = await this.convertLinkContent(content.content)
 
-            const doc = await this.syClient.createDocWithMd({
-                markdown: linkcontent,
-                notebook: this.config.selectedNotebookId,
-                path: `${ret.data}/${content.title}`,
-            })
-            console.log("create doc", doc)
-
-            // const block = await this.syClient.appendBlock({
-            //     parentID: this.config.selectedDocId,
-            //     dataType:"dom",
-            //     data: `<span data-type="block-ref" data-subtype="d" data-id="${doc.data}">${content.title}</span>`,
-            // })
-            // console.log("create block", block)
-            return
-        } else {
-            return
-        }
         let data = note.content;
         try {
             // 处理图片类型内容
@@ -403,6 +375,24 @@ export default class SyncPlugin extends Plugin {
                     console.error('处理图片失败:', error);
                     data = `图片处理失败: ${error.message}`;
                 }
+            } else if (note.contentType === 'link') {
+                const content = await this.syncApi.getLinkContent(note.id)
+                const hpath = await this.syClient.getHPathByID({
+                    id: this.config.selectedDocId
+                });
+
+                const doc = await this.syClient.createDocWithMd({
+                    markdown: content.content,
+                    notebook: this.config.selectedNotebookId,
+                    path: `${hpath.data}/${content.title}`,
+                });
+
+                console.log('Save markdown image:', doc.data);
+                await fetchPost('/api/format/netImg2LocalAssets', {
+                    id: doc.data,
+                })
+
+                data = `<span data-type="block-ref" data-subtype="d" data-id="${doc.data}">${content.title}</span>`;
             }
 
             if (this.lastSyncTime == 0 || timestamp - this.lastSyncTime > 300 * 1000) {
@@ -410,29 +400,18 @@ export default class SyncPlugin extends Plugin {
                 await this.saveData("syncTime.json", this.lastSyncTime)
 
                 console.log(`开始写入文档 [${this.config.selectedDocName}]，最后时间为+++ [${this.lastSyncTime}]`);
-                await fetchPost('/api/block/appendBlock',
-                    {
-                        dataType: "markdown",
-                        data: `## ${formattedtitle}`,
-                        parentID: this.config.selectedDocId
-                    }
-                )
-                await fetchPost('/api/block/appendBlock',
-                    {
-                        dataType: "markdown",
-                        data: typeof data === 'string' ? data : JSON.stringify(data, null, 2),
-                        parentID: this.config.selectedDocId
-                    }
-                );
-
-            } else {
-                console.log(`开始写入文档 [${this.config.selectedDocName}]，最后时间为=== [${this.lastSyncTime}]`);
-                await fetchPost('/api/block/appendBlock', {
+                await this.syClient.appendBlock({
                     dataType: "markdown",
-                    data: typeof data === 'string' ? data : JSON.stringify(data, null, 2),
+                    data: `## ${formattedtitle}`,
                     parentID: this.config.selectedDocId
                 })
             }
+
+            await this.syClient.appendBlock({
+                dataType: "markdown",
+                data: typeof data === 'string' ? data : JSON.stringify(data, null, 2),
+                parentID: this.config.selectedDocId
+            })
         } catch (error) {
             console.error('写入文档失败:', error);
             throw error;
@@ -444,82 +423,5 @@ export default class SyncPlugin extends Plugin {
         if (this.syncTimer) {
             clearInterval(this.syncTimer);
         }
-    }
-
-    private async convertLinkContent(content: string): Promise<string> {
-        // 正则表达式匹配 markdown 中的图片链接
-        const imageRegex = /!\[.*?\]\((https?:\/\/[^)]+)\)/g;
-        let match;
-        let processedContent = content;
-
-        // 查找所有图片链接并处理
-        while ((match = imageRegex.exec(content)) !== null) {
-            const originalUrl = match[1];
-            const originalMarkdown = match[0];
-
-            try {
-                // 下载图片
-                const response = await fetch(originalUrl);
-                if (!response.ok) {
-                    throw new Error(`下载图片失败: ${response.status}`);
-                }
-
-                // 获取图片数据和文件名
-                const imageBlob = await response.blob();
-                const fileName = this.getFileNameFromUrl(originalUrl);
-
-                // 准备上传到思源笔记
-                const formData = new FormData();
-                formData.append('file[]', imageBlob, fileName);
-
-                // 上传到思源笔记
-                const uploadResponse = await fetch('/api/asset/upload', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                if (!uploadResponse.ok) {
-                    throw new Error(`上传图片失败: ${uploadResponse.status}`);
-                }
-
-                const uploadResult = await uploadResponse.json();
-                if (uploadResult.code !== 0) {
-                    throw new Error(`上传图片失败: ${uploadResult.msg}`);
-                }
-
-                // 获取上传后的资源路径
-                const assetPath = uploadResult.data.succMap[Object.keys(uploadResult.data.succMap)[0]];
-
-                // 替换原始图片链接为思源笔记资源链接
-                const newMarkdown = originalMarkdown.replace(originalUrl, assetPath);
-                processedContent = processedContent.replace(originalMarkdown, newMarkdown);
-
-                console.log(`已替换图片链接: ${originalUrl} -> ${assetPath}`);
-            } catch (error) {
-                console.error(`处理图片失败 [${originalUrl}]:`, error);
-                // 保留原始链接，不做替换
-            }
-        }
-
-        return processedContent;
-    }
-
-    private getFileNameFromUrl(url: string): string {
-        // 从 URL 中提取文件名
-        const urlObj = new URL(url);
-        const pathname = urlObj.pathname;
-        let fileName = pathname.split('/').pop() || 'image.png';
-
-        // 确保文件名有扩展名
-        if (!fileName.includes('.')) {
-            // 尝试从 Content-Type 获取扩展名，如果失败则默认为 .png
-            fileName += '.png';
-        }
-
-        // 生成唯一文件名避免冲突
-        const timestamp = new Date().getTime();
-        const randomStr = Math.random().toString(36).substring(2, 8);
-        const ext = fileName.substring(fileName.lastIndexOf('.'));
-        return `wechat_sync_${timestamp}_${randomStr}${ext}`;
     }
 }
