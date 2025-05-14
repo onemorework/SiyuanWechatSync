@@ -1,7 +1,8 @@
 import { Plugin, showMessage, fetchPost } from "siyuan";
 import { ICONS } from './icons';
 import { SettingUtils } from "./libs/setting-utils";
-import { VERSION } from './config'
+import { VERSION } from './config';
+import { Client } from "@siyuan-community/siyuan-sdk";
 import ServerAPI from './apis/server-api';
 
 export default class SyncPlugin extends Plugin {
@@ -15,6 +16,7 @@ export default class SyncPlugin extends Plugin {
         syncOnLoad: boolean;
     };
 
+    private syClient: Client;
     private syncApi: ServerAPI;
     private syncTimer: NodeJS.Timeout;
     private settingUtils: SettingUtils;
@@ -26,6 +28,8 @@ export default class SyncPlugin extends Plugin {
 
     async onload() {
         console.log(`Load siyuan weichat sync plugin: [${VERSION}]`);
+
+        this.syClient = new Client()
 
         this.config = await this.loadData("config.json") || {
             token: "",
@@ -309,7 +313,7 @@ export default class SyncPlugin extends Plugin {
             console.log(`开始同步到笔记本 [${this.config.selectedNotebookName}] 的文档 [${this.config.selectedDocName}]`);
             const writtenIds: string[] = [];
             for (const item of records) {
-                await this.writeDataToDoc(item.createdAt, item.content, item.contentType);
+                await this.writeDataToDoc(item);
                 writtenIds.push(item.id);
             }
 
@@ -323,10 +327,10 @@ export default class SyncPlugin extends Plugin {
         }
     }
 
-    private async writeDataToDoc(title: any, data: any, contentType: string = 'text') {
-        const timeInstance = new Date(title);
+    private async writeDataToDoc(note: NotePushBackendapiNoteV1RecordRes) {
+        const timeInstance = new Date(note.createdAt);
         const timestamp = timeInstance.getTime();
-        console.log(`开始写入文档 [${this.config.selectedDocName}]，时间为 [${timestamp}]，内容类型为 [${contentType}]`);
+        console.log(`开始写入文档 [${this.config.selectedDocName}]，时间为 [${timestamp}]，内容类型为 [${note.contentType}]`);
 
         const year = timeInstance.getFullYear();
         const month = String(timeInstance.getMonth() + 1).padStart(2, '0');
@@ -338,15 +342,13 @@ export default class SyncPlugin extends Plugin {
         const formattedtitle = `${year}-${month}-${day} ${hours}:${minutes}`;
         console.log(`日期字符串为 [${formattedtitle}]`);
 
+        let data = note.content;
         try {
-            const diifTime = timestamp - this.lastSyncTime
-            console.log(`时间差： ${diifTime}`)
-
             // 处理图片类型内容
-            if (contentType === 'image') {
+            if (note.contentType === 'image') {
                 try {
                     // 获取图片数据
-                    const imageData = await this.syncApi.getImageContent(data)
+                    const imageData = await this.syncApi.getImageContent(note.content)
                     const formData = new FormData();
                     formData.append('file[]', imageData.content, `${imageData.name}`);
 
@@ -373,6 +375,24 @@ export default class SyncPlugin extends Plugin {
                     console.error('处理图片失败:', error);
                     data = `图片处理失败: ${error.message}`;
                 }
+            } else if (note.contentType === 'link') {
+                const content = await this.syncApi.getLinkContent(note.id)
+                const hpath = await this.syClient.getHPathByID({
+                    id: this.config.selectedDocId
+                });
+
+                const doc = await this.syClient.createDocWithMd({
+                    markdown: content.content,
+                    notebook: this.config.selectedNotebookId,
+                    path: `${hpath.data}/${content.title}`,
+                });
+
+                console.log('Save markdown image:', doc.data);
+                await fetchPost('/api/format/netImg2LocalAssets', {
+                    id: doc.data,
+                })
+
+                data = `<span data-type="block-ref" data-subtype="d" data-id="${doc.data}">${content.title}</span>`;
             }
 
             if (this.lastSyncTime == 0 || timestamp - this.lastSyncTime > 300 * 1000) {
@@ -380,29 +400,18 @@ export default class SyncPlugin extends Plugin {
                 await this.saveData("syncTime.json", this.lastSyncTime)
 
                 console.log(`开始写入文档 [${this.config.selectedDocName}]，最后时间为+++ [${this.lastSyncTime}]`);
-                await fetchPost('/api/block/appendBlock',
-                    {
-                        dataType: "markdown",
-                        data: `## ${formattedtitle}`,
-                        parentID: this.config.selectedDocId
-                    }
-                )
-                await fetchPost('/api/block/appendBlock',
-                    {
-                        dataType: "markdown",
-                        data: typeof data === 'string' ? data : JSON.stringify(data, null, 2),
-                        parentID: this.config.selectedDocId
-                    }
-                );
-
-            } else {
-                console.log(`开始写入文档 [${this.config.selectedDocName}]，最后时间为=== [${this.lastSyncTime}]`);
-                await fetchPost('/api/block/appendBlock', {
+                await this.syClient.appendBlock({
                     dataType: "markdown",
-                    data: typeof data === 'string' ? data : JSON.stringify(data, null, 2),
+                    data: `## ${formattedtitle}`,
                     parentID: this.config.selectedDocId
                 })
             }
+
+            await this.syClient.appendBlock({
+                dataType: "markdown",
+                data: typeof data === 'string' ? data : JSON.stringify(data, null, 2),
+                parentID: this.config.selectedDocId
+            })
         } catch (error) {
             console.error('写入文档失败:', error);
             throw error;
