@@ -4,7 +4,7 @@
 
 一个用于将微信公众号（云笔记助手）的内容同步保存到思源笔记的插件。
 
-<img src="./asset/wechat_qr.png" alt="weichat" width="300"/>
+<img src="https://fastly.jsdelivr.net/gh/onemorework/SiyuanWechatSync/asset/wechat_qr.png" alt="weichat" width="300"/>
 
 ## 隐私安全说明
 
@@ -57,7 +57,7 @@
 
 ## 更新日志
 
-请查看 [CHANGELOG.md](./CHANGELOG.md)
+请查看 [CHANGELOG.md](https://fastly.jsdelivr.net/gh/onemorework/SiyuanWechatSync/CHANGELOG.md)
 
 ## 反馈问题
 
@@ -68,7 +68,7 @@
 
 ## 开源协议
 
-本插件采用 [LGPL-3.0](./LICENSE) 协议开源。
+本插件采用 [LGPL-3.0](https://fastly.jsdelivr.net/gh/onemorework/SiyuanWechatSync/LICENSE) 协议开源。
 
 ## 致谢
 

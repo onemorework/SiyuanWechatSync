@@ -4,7 +4,7 @@
 
 A plugin to sync content from the WeChat public account (云笔记助手) to Siyuan Note.
 
-<img src="./asset/wechat_qr.png" alt="wechat" width="300"/>
+<img src="https://fastly.jsdelivr.net/gh/onemorework/SiyuanWechatSync/asset/wechat_qr.png" alt="wechat" width="300"/>
 
 ## Privacy and Security
 
@@ -57,7 +57,7 @@ A plugin to sync content from the WeChat public account (云笔记助手) to Siy
 
 ## Changelog
 
-Please check [CHANGELOG.md](./CHANGELOG.md)
+Please check [CHANGELOG.md](https://fastly.jsdelivr.net/gh/onemorework/SiyuanWechatSync/CHANGELOG.md)
 
 ## Feedback
 
@@ -68,7 +68,7 @@ If you encounter any problems or have any suggestions during use, please provide
 
 ## License
 
-This plugin is open-sourced under the [LGPL-3.0](./LICENSE) license.
+This plugin is open-sourced under the [LGPL-3.0](https://fastly.jsdelivr.net/gh/onemorework/SiyuanWechatSync/LICENSE) license.
 
 ## Acknowledgements
 

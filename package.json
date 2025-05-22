@@ -1,6 +1,6 @@
 {
   "name": "siyuan-sync-plugin",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "type": "module",
   "description": "A plugin to sync content from the WeChat public account (云笔记助手) to Siyuan Note.",
   "repository": "",
