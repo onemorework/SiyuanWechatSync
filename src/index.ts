@@ -4,7 +4,17 @@ import { SettingUtils } from "./libs/setting-utils";
 import { VERSION } from './config';
 import { Client } from "@siyuan-community/siyuan-sdk";
 import ServerAPI from './apis/server-api';
-import QRCode from 'qrcode';
+import { decryptImage } from './utils/ImageDecryption.js';
+import { TextCrypto } from './utils/TextCrypto';
+import { QRCodeUtils } from './utils/QRCodeUtils';
+
+// 确保基础环境兼容
+if (typeof global === 'undefined') {
+    (window as any).global = window;
+}
+if (typeof process === 'undefined') {
+    (window as any).process = { env: {}, argv: [] };
+}
 
 // declare module 'qrcode';
 
@@ -69,13 +79,90 @@ export default class SyncPlugin extends Plugin {
 
         this.settingUtils.addItem({
             key: "token",
-            type: "textinput",
+            type: "custom",
             title: "Token",
             value: this.config.token,
             description: "访问令牌",
+            createElement: () => {
+                const container = document.createElement('div');
+                container.className = 'fn__flex-1';
+                container.style.display = 'flex';
+                container.style.flexDirection = 'column';
+                container.style.alignItems = 'flex-end';
+                container.style.width = '100%';
+                container.style.maxWidth = '600px';
+                const inputContainer = document.createElement('div');
+                inputContainer.style.width = '100%';
+                inputContainer.style.maxWidth = '240px';
+                inputContainer.style.display = 'flex';
+                inputContainer.style.justifyContent = 'flex-end';
+
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.className = 'b3-text-field fn__flex-center';
+                input.value = this.config.token;
+                input.style.width = '100%';
+                input.style.boxSizing = 'border-box';
+
+                input.addEventListener('input', () => {
+                    this.config.token = input.value;
+                    this.saveData("config.json", this.config);
+                });
+
+                const buttonContainer = document.createElement('div');
+                buttonContainer.style.display = 'flex';
+                buttonContainer.style.justifyContent = 'flex-end';
+                buttonContainer.style.gap = '8px';
+                buttonContainer.style.marginTop = '8px';
+                buttonContainer.style.width = '100%';
+                buttonContainer.style.maxWidth = '240px';
+
+                const qrButton = document.createElement('button');
+                qrButton.className = 'b3-button b3-button--outline';
+                qrButton.style.display = 'flex';
+                qrButton.style.alignItems = 'center';
+                qrButton.style.justifyContent = 'center';
+                qrButton.style.gap = '8px';
+                qrButton.style.padding = '4px 12px';
+                qrButton.title = "生成Token二维码";
+                qrButton.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <rect x="7" y="7" width="3" height="3"></rect>
+                        <rect x="14" y="7" width="3" height="3"></rect>
+                        <rect x="7" y="14" width="3" height="3"></rect>
+                        <rect x="14" y="14" width="3" height="3"></rect>
+                    </svg>
+                    <span>生成二维码</span>
+                `;
+                qrButton.onclick = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (!input.value.trim()) {
+                        this.showMessage("请先输入Token再生成二维码");
+                        return;
+                    }
+                    this.showTokenQRCode(input.value);
+                };
+
+                inputContainer.appendChild(input);
+                buttonContainer.appendChild(qrButton);
+                container.appendChild(inputContainer);
+                container.appendChild(buttonContainer);
+
+                return container;
+            },
+            getEleVal: (ele) => {
+                return ele.querySelector('input').value;
+            },
+            setEleVal: (ele, val) => {
+                ele.querySelector('input').value = val || '';
+            },
             action: {
                 callback: async () => {
-                    const token = this.settingUtils.take("token", true);
+                    const oldToken = this.settingUtils.take("token", true);
+                    const inputElement = this.settingUtils.getElement("token").querySelector('input');
+                    const token = inputElement ? inputElement.value : oldToken;
                     this.config.token = token;
                     this.syncApi.updateToken(token);
                     await this.saveData("config.json", this.config);
@@ -253,28 +340,114 @@ export default class SyncPlugin extends Plugin {
             type: "custom",
             title: "AES-GCM-256加密盐值",
             value: this.config.saltValue,
-            description: "加密用的盐值（48位，前16位为iv，后32位为密钥）",
-            createElement: (currentVal) => {
+            description: "加密用的盐值（48位或更长，前16位为iv，后面为密钥）",
+            createElement: () => {
                 const container = document.createElement('div');
                 container.className = 'salt-value-container';
                 container.style.display = 'flex';
-                container.style.alignItems = 'center';
+                container.style.flexDirection = 'column';
                 container.style.gap = '8px';
+
+                // 输入框容器
+                const inputContainer = document.createElement('div');
+                inputContainer.style.display = 'flex';
+                inputContainer.style.alignItems = 'center';
+                inputContainer.style.width = '100%';
 
                 const input = document.createElement('input');
                 input.type = 'text';
-                input.className = 'b3-text-field fn__flex-center fn__size200';
-                input.value = currentVal || '';
-                input.placeholder = '请输入48位盐值';
+                input.className = 'b3-text-field fn__flex-center';
+                // 确保始终使用最新的配置值
+                input.value = this.config.saltValue || '';
+                input.placeholder = '请输入盐值（至少48位）';
                 input.style.flex = '1';
 
+                // 添加输入监听器，确保实时更新配置
+                input.addEventListener('input', () => {
+                    this.config.saltValue = input.value;
+                    // 实时保存，防止丢失
+                    this.saveData("config.json", this.config);
+                    console.log('盐值已实时更新:', this.config.saltValue);
+                });
+
+                inputContainer.appendChild(input);
+
+                // 按钮容器
+                const buttonContainer = document.createElement('div');
+                buttonContainer.style.display = 'flex';
+                buttonContainer.style.justifyContent = 'flex-end';
+                buttonContainer.style.gap = '8px';
+                buttonContainer.style.marginTop = '8px';
+
+                // 生成盐值按钮
+                const genButton = document.createElement('button');
+                genButton.className = 'b3-button b3-button--outline';
+                genButton.style.display = 'flex';
+                genButton.style.alignItems = 'center';
+                genButton.style.justifyContent = 'center';
+                genButton.style.gap = '8px';
+                genButton.style.padding = '4px 12px';
+                genButton.title = "生成一个随机安全的盐值"; // 添加提示
+                genButton.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"></path>
+                    </svg>
+                    <span>生成盐值</span>
+                `;
+                genButton.onclick = () => {
+                    try {
+                        // 使用QRCodeUtils生成安全的盐值
+                        const randomString = QRCodeUtils.generateSecureSalt();
+
+                        // 立即更新UI和配置
+                        input.value = randomString;
+                        this.config.saltValue = randomString;
+                        this.saveData("config.json", this.config).then(() => {
+                            console.log('生成的新盐值已保存:', this.config.saltValue);
+                            this.showMessage("盐值已生成并保存");
+                        });
+                    } catch (error) {
+                        console.error('生成盐值失败:', error);
+                        this.showMessage("生成盐值失败: " + error.message);
+                    }
+                };
+
+                // 生成二维码按钮
                 const qrButton = document.createElement('button');
                 qrButton.className = 'b3-button b3-button--outline';
-                qrButton.innerHTML = '生成二维码';
-                qrButton.onclick = () => this.showSaltQRCode(input.value);
+                qrButton.style.display = 'flex';
+                qrButton.style.alignItems = 'center';
+                qrButton.style.justifyContent = 'center';
+                qrButton.style.gap = '8px';
+                qrButton.style.padding = '4px 12px';
+                qrButton.title = "将盐值生成二维码分享"; // 添加提示
+                qrButton.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <rect x="7" y="7" width="3" height="3"></rect>
+                        <rect x="14" y="7" width="3" height="3"></rect>
+                        <rect x="7" y="14" width="3" height="3"></rect>
+                        <rect x="14" y="14" width="3" height="3"></rect>
+                    </svg>
+                    <span>生成二维码</span>
+                `;
+                qrButton.onclick = () => {
+                    if (!input.value.trim()) {
+                        this.showMessage("请先输入或生成盐值");
+                        return;
+                    }
+                    if (input.value.trim().length < 48) {
+                        this.showMessage("盐值长度不足，请确保盐值至少48位");
+                        return;
+                    }
+                    this.showSaltQRCode(input.value);
+                };
 
-                container.appendChild(input);
-                container.appendChild(qrButton);
+                buttonContainer.appendChild(genButton);
+                buttonContainer.appendChild(qrButton);
+
+                container.appendChild(inputContainer);
+                container.appendChild(buttonContainer);
 
                 return container;
             },
@@ -282,13 +455,24 @@ export default class SyncPlugin extends Plugin {
                 return ele.querySelector('input').value;
             },
             setEleVal: (ele, val) => {
-                ele.querySelector('input').value = val;
+                // 同步UI和配置
+                ele.querySelector('input').value = this.config.saltValue || val || '';
             },
             action: {
                 callback: async () => {
-                    const saltValue = this.settingUtils.take("saltValue", true);
-                    this.config.saltValue = saltValue;
-                    await this.saveData("config.json", this.config);
+                    // 使用当前输入框的值，而不是settingUtils中的值
+                    const inputElement = this.settingUtils.getElement("saltValue").querySelector('input');
+                    const saltValue = inputElement ? inputElement.value : "";
+
+                    if (saltValue) {
+                        this.config.saltValue = saltValue;
+                        await this.saveData("config.json", this.config);
+                        console.log('盐值回调保存成功:', this.config.saltValue);
+                        this.showMessage("盐值已成功保存");
+                    } else {
+                        console.warn('盐值为空，未保存');
+                        this.showMessage("盐值为空，请输入有效盐值");
+                    }
                 }
             }
         });
@@ -377,6 +561,33 @@ export default class SyncPlugin extends Plugin {
         }
     }
 
+    /**
+     * 解密数据
+     * @param encryptedText Base64编码的加密文本
+     * @returns 解密后的文本
+     */
+    private async decryptData(encryptedText: string): Promise<string> {
+        if (!this.config.saltValue || this.config.saltValue.length < 48) {
+            // 确保盐值已正确加载
+            const savedConfig = await this.loadData("config.json");
+            if (savedConfig && savedConfig.saltValue && savedConfig.saltValue.length >= 48) {
+                this.config.saltValue = savedConfig.saltValue;
+                console.log('已从配置文件重新加载盐值:', this.config.saltValue);
+            } else {
+                throw new Error('无效的加密盐值');
+            }
+        }
+
+        try {
+            // 使用小程序端兼容的解密方法
+            console.log('解密使用的当前盐值:', this.config.saltValue);
+            return TextCrypto.decryptText(encryptedText, this.config.saltValue);
+        } catch (error) {
+            console.error('解密失败:', error);
+            throw error;
+        }
+    }
+
     private async writeDataToDoc(note: NotePushBackendapiNoteV1RecordRes) {
         const timeInstance = new Date(note.createdAt);
         const timestamp = timeInstance.getTime();
@@ -394,6 +605,23 @@ export default class SyncPlugin extends Plugin {
 
         let data = note.content;
         try {
+            const diifTime = timestamp - this.lastSyncTime
+            console.log(`时间差： ${diifTime}`)
+
+            let processedData = data;
+            if (this.config.saltValue && note.contentType == 'secretText') {
+                console.log("ssssssssssss")
+                try {
+                    console.log('检测到Base64数据，尝试解密...',data);
+                    processedData = await this.decryptData(data);
+                    console.log('数据解密成功',processedData);
+                } catch (decryptError) {
+                    console.log('数据解密失败，使用原始数据:', decryptError);
+                    processedData = data; // 解密失败，使用原始数据
+                    this.showMessage(`解密数据失败: ${decryptError.message}`);
+                }
+            }
+
             // 处理图片类型内容
             if (note.contentType === 'image') {
                 try {
@@ -420,10 +648,83 @@ export default class SyncPlugin extends Plugin {
                     // 获取上传后的资源路径
                     const assetPath = uploadResult.data.succMap[Object.keys(uploadResult.data.succMap)[0]];
                     // data = `![image](${assetPath}){: style="width: 30vh"}`;
-                    data = `![image](${assetPath})`;
+                    processedData = `![image](${assetPath})`;
                 } catch (error) {
                     console.error('处理图片失败:', error);
-                    data = `图片处理失败: ${error.message}`;
+                    processedData = `图片处理失败: ${error.message}`;
+                }
+            } else if (note.contentType == 'secretImage') {
+                try {
+                    console.log('处理加密图片...',data);
+                    const imageData = await this.syncApi.getImageContent(data);
+                    const encryptedContent = await this.blobToText(imageData.content);
+                    console.log('获取到加密内容，长度:', encryptedContent.length);
+
+                    try {
+                        let jsonData;
+                        try {
+                            jsonData = JSON.parse(encryptedContent);
+                        } catch (e) {
+                            console.warn('JSON解析失败，尝试直接解密:', e);
+                            jsonData = { data: encryptedContent };
+                        }
+                        console.log('JSON数据+++++++++++++++++++++++++:', jsonData)
+                        const decryptedData = await this.decryptImageData(jsonData, this.config.saltValue);
+                        console.log('图片扩展名:', decryptedData.extension);
+                        // 创建解密后的图片Blob
+                        const imageBlob = this.base64ToBlob(
+                            decryptedData.data,
+                            `image/${decryptedData.extension|| 'jpeg'}`
+                        );
+
+                        // 上传解密后的图片
+                        const formData = new FormData();
+                        formData.append('file[]', imageBlob, imageData.name);
+
+                        // 上传到思源笔记
+                        const uploadResponse = await fetch('/api/asset/upload', {
+                            method: 'POST',
+                            body: formData
+                        });
+
+                        if (!uploadResponse.ok) {
+                            throw new Error(`上传解密图片失败: ${uploadResponse.status}`);
+                        }
+
+                        const uploadResult = await uploadResponse.json();
+                        if (uploadResult.code !== 0) {
+                            throw new Error(`上传解密图片失败: ${uploadResult.msg}`);
+                        }
+
+                        // 获取上传后的资源路径
+                        const assetPath = uploadResult.data.succMap[Object.keys(uploadResult.data.succMap)[0]];
+                        processedData = `![image](${assetPath})`;
+                        console.log('加密图片处理成功');
+                    } catch (decryptError) {
+                        console.error('解密图片失败:', decryptError);
+
+                        // 解密失败时，上传原始图片并添加提示
+                        const formData = new FormData();
+                        formData.append('file[]', imageData.content, imageData.name);
+
+                        const uploadResponse = await fetch('/api/asset/upload', {
+                            method: 'POST',
+                            body: formData
+                        });
+
+                        if (!uploadResponse.ok) {
+                            throw new Error(`上传原始加密图片失败: ${uploadResponse.status}`);
+                        }
+
+                        const uploadResult = await uploadResponse.json();
+                        const assetPath = uploadResult.data.succMap[Object.keys(uploadResult.data.succMap)[0]];
+                        processedData = `![image](${assetPath})
+                        
+> 注意：此图片是加密图片，但解密失败，显示的是原始加密图片。错误: ${decryptError.message}`;
+                    }
+                } catch (error) {
+                    console.error('处理加密图片最终失败:', error);
+                    processedData = `加密图片处理失败: ${error.message}`;
                 }
             } else if (note.contentType === 'link') {
                 const content = await this.syncApi.getLinkContent(note.id)
@@ -459,7 +760,7 @@ export default class SyncPlugin extends Plugin {
 
             await this.syClient.appendBlock({
                 dataType: "markdown",
-                data: typeof data === 'string' ? data : JSON.stringify(data, null, 2),
+                data: typeof processedData === 'string' ? data : JSON.stringify(processedData, null, 2),
                 parentID: this.config.selectedDocId
             })
         } catch (error) {
@@ -481,59 +782,67 @@ export default class SyncPlugin extends Plugin {
             return;
         }
 
-        const dialog = document.createElement('div');
-        dialog.className = 'b3-dialog b3-dialog--open';
-        dialog.innerHTML = `
-            <div class="b3-dialog__scrim"></div>
-            <div class="b3-dialog__container" style="width: 320px; height: 400px">
-                <div class="b3-dialog__header">
-                    <span class="b3-dialog__title">盐值二维码</span>
-                    <button class="b3-button b3-button--text" data-type="close">
-                        <svg class="b3-button__icon"><use xlink:href="#iconClose"></use></svg>
-                    </button>
-                </div>
-                <div class="b3-dialog__content">
-                    <div id="qrcode-container" style="display: flex; justify-content: center; padding: 16px;"></div>
-                    <div style="text-align: center; margin-top: 8px; color: var(--b3-theme-on-surface);">
-                        扫描二维码获取盐值
-                    </div>
-                </div>
-            </div>
-        `;
-
-        document.body.appendChild(dialog);
-
-        const closeButton = dialog.querySelector('[data-type="close"]');
-        if (closeButton) {
-            closeButton.addEventListener('click', () => {
-                document.body.removeChild(dialog);
-            });
-        }
-
-        const scrim = dialog.querySelector('.b3-dialog__scrim');
-        if (scrim) {
-            scrim.addEventListener('click', () => {
-                document.body.removeChild(dialog);
-            });
-        }
-
-        this.renderSimpleQRCode(saltValue);
+        QRCodeUtils.createQRCodeDialog(
+            saltValue,
+            "盐值二维码",
+            "扫描二维码获取盐值",
+            "盐值二维码.png"
+        );
     }
 
-    private renderSimpleQRCode(text: string) {
-        const container = document.getElementById('qrcode-container');
-        if (container) {
-            container.innerHTML = '';
-            QRCode.toCanvas(container, text, {
-                width: 256,
-                margin: 4,
-                color: {
-                    dark: '#000000',
-                    light: '#FFFFFF'
-                }
-            }, (error) => {
-                if (error) console.error(error);
-            });
+    private showTokenQRCode(token: string) {
+        if (!token) {
+            this.showMessage("请先输入Token");
+            return;
+        }
+
+        QRCodeUtils.createQRCodeDialog(
+            token,
+            "Token二维码",
+            "扫描二维码获取Token",
+            "Token二维码.png"
+        );
+    }
+
+    /**
+     * 将Blob对象转换为文本
+     * @param blob Blob数据
+     * @returns 文本内容
+     */
+    private async blobToText(blob: Blob): Promise<string> {
+        return TextCrypto.blobToText(blob);
+    }
+
+    /**
+     * 将Base64字符串转换为Blob对象
+     * @param base64 Base64编码的字符串
+     * @param mimeType MIME类型
+     * @returns Blob对象
+     */
+    private base64ToBlob(base64: string, mimeType: string): Blob {
+        return TextCrypto.base64ToBlob(base64, mimeType);
+    }
+
+    /**
+     * 解密图片数据
+     * @param encryptedData 加密的图片数据对象
+     * @param salt 解密用的盐值
+     * @returns 解密后的图片数据
+     */
+    private async decryptImageData(encryptedData: any, salt: string): Promise<any> {
+        if (!encryptedData) {
+            throw new Error('无效的加密图片数据格式');
+        }
+
+        if (!salt || salt.length < 48) {
+            throw new Error('无效的解密盐值');
+        }
+
+        try {
+            return decryptImage(encryptedData, salt);
+        } catch (error) {
+            console.error('图片解密失败:', error);
+            throw new Error(`图片解密处理失败: ${error.message}`);
         }
     }
 }
