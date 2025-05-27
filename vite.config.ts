@@ -36,7 +36,8 @@ export default defineConfig({
                 { src: "./README*.md", dest: "./" },
                 { src: "./plugin.json", dest: "./" },
                 { src: "./preview.png", dest: "./" },
-                { src: "./icon.png", dest: "./" }
+                { src: "./icon.png", dest: "./" },
+                { src: "./asset/**", dest: "./asset/" }
             ],
         }),
 
@@ -90,7 +91,14 @@ export default defineConfig({
                 ])
             ],
 
-            external: ["siyuan", "process"],
+            external: [
+                "siyuan", 
+                "process",
+                "fs",
+                "path",
+                "crypto",
+                "url"
+            ],
 
             output: {
                 entryFileNames: "[name].js",
@@ -101,7 +109,7 @@ export default defineConfig({
                     if (assetInfo.name === 'icon.png') {
                         return 'icon.png';
                     }
-                    return assetInfo.name
+                    return assetInfo.name || 'unknown';
                 },
             },
         },
