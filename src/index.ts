@@ -610,13 +610,10 @@ export default class SyncPlugin extends Plugin {
 
             let processedData = data;
             if (this.config.saltValue && note.contentType == 'secretText') {
-                console.log("ssssssssssss")
                 try {
-                    console.log('检测到Base64数据，尝试解密...',data);
                     processedData = await this.decryptData(data);
                     console.log('数据解密成功',processedData);
                 } catch (decryptError) {
-                    console.log('数据解密失败，使用原始数据:', decryptError);
                     processedData = data; // 解密失败，使用原始数据
                     this.showMessage(`解密数据失败: ${decryptError.message}`);
                 }
@@ -655,11 +652,8 @@ export default class SyncPlugin extends Plugin {
                 }
             } else if (note.contentType == 'secretImage') {
                 try {
-                    console.log('处理加密图片...',data);
                     const imageData = await this.syncApi.getImageContent(data);
                     const encryptedContent = await this.blobToText(imageData.content);
-                    console.log('获取到加密内容，长度:', encryptedContent.length);
-
                     try {
                         let jsonData;
                         try {
@@ -668,20 +662,14 @@ export default class SyncPlugin extends Plugin {
                             console.warn('JSON解析失败，尝试直接解密:', e);
                             jsonData = { data: encryptedContent };
                         }
-                        console.log('JSON数据+++++++++++++++++++++++++:', jsonData)
                         const decryptedData = await this.decryptImageData(jsonData, this.config.saltValue);
-                        console.log('图片扩展名:', decryptedData.extension);
-                        // 创建解密后的图片Blob
                         const imageBlob = this.base64ToBlob(
                             decryptedData.data,
                             `image/${decryptedData.extension|| 'jpeg'}`
                         );
-
-                        // 上传解密后的图片
                         const formData = new FormData();
                         formData.append('file[]', imageBlob, imageData.name);
 
-                        // 上传到思源笔记
                         const uploadResponse = await fetch('/api/asset/upload', {
                             method: 'POST',
                             body: formData
@@ -695,8 +683,6 @@ export default class SyncPlugin extends Plugin {
                         if (uploadResult.code !== 0) {
                             throw new Error(`上传解密图片失败: ${uploadResult.msg}`);
                         }
-
-                        // 获取上传后的资源路径
                         const assetPath = uploadResult.data.succMap[Object.keys(uploadResult.data.succMap)[0]];
                         processedData = `![image](${assetPath})`;
                         console.log('加密图片处理成功');
@@ -760,7 +746,7 @@ export default class SyncPlugin extends Plugin {
 
             await this.syClient.appendBlock({
                 dataType: "markdown",
-                data: typeof processedData === 'string' ? data : JSON.stringify(processedData, null, 2),
+                data: typeof processedData === 'string' ? processedData : JSON.stringify(processedData, null, 2),
                 parentID: this.config.selectedDocId
             })
         } catch (error) {
