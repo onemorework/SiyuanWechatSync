@@ -155,19 +155,13 @@ export default class SyncPlugin extends Plugin {
             getEleVal: (ele) => {
                 return ele.querySelector('input').value;
             },
-            setEleVal: (ele, val) => {
+            setEleVal: async (ele, val) => {
                 ele.querySelector('input').value = val || '';
+
+                this.config.token = val;
+                this.syncApi.updateToken(val);
+                await this.saveData("config.json", this.config);
             },
-            action: {
-                callback: async () => {
-                    const oldToken = this.settingUtils.take("token", true);
-                    const inputElement = this.settingUtils.getElement("token").querySelector('input');
-                    const token = inputElement ? inputElement.value : oldToken;
-                    this.config.token = token;
-                    this.syncApi.updateToken(token);
-                    await this.saveData("config.json", this.config);
-                }
-            }
         });
 
         this.settingUtils.addItem({
@@ -705,7 +699,7 @@ export default class SyncPlugin extends Plugin {
                         const uploadResult = await uploadResponse.json();
                         const assetPath = uploadResult.data.succMap[Object.keys(uploadResult.data.succMap)[0]];
                         processedData = `![image](${assetPath})
-                        
+
 > 注意：此图片是加密图片，但解密失败，显示的是原始加密图片。错误: ${decryptError.message}`;
                     }
                 } catch (error) {
