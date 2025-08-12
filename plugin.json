@@ -3,7 +3,7 @@
   "logo": "icon.png",
   "author": "onemorework",
   "url": "https://github.com/onemorework/SiyuanWechatSync",
-  "version": "0.3.2",
+  "version": "1.0.0",
   "minAppVersion": "2.10.13",
   "displayName": {
     "default": "微信同步插件",
