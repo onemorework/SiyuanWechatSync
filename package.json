@@ -16,6 +16,7 @@
     "make-install": "vite build && node --no-warnings ./scripts/make_install.js"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.3.10",
     "@sveltejs/adapter-auto": "^3.3.1",
     "@sveltejs/kit": "^2.21.1",
     "@sveltejs/vite-plugin-svelte": "^3.1.2",
@@ -23,6 +24,7 @@
     "@types/node": "^20.17.50",
     "@types/qrcode": "^1.5.5",
     "cross-env": "^7.0.3",
+    "dotenv": "^16.4.7",
     "fast-glob": "^3.3.3",
     "glob": "^10.4.5",
     "js-yaml": "^4.1.0",

@@ -1,11 +1,10 @@
-import { Plugin, showMessage, fetchPost } from "siyuan";
+import { Client } from "@siyuan-community/siyuan-sdk";
+import { fetchPost, Plugin, showMessage } from "siyuan";
+import ServerAPI from './apis/server-api';
+import { VERSION } from './config';
 import { ICONS } from './icons';
 import { SettingUtils } from "./libs/setting-utils";
-import { VERSION } from './config';
-import { Client } from "@siyuan-community/siyuan-sdk";
-import ServerAPI from './apis/server-api';
-import { decryptImage } from './utils/ImageDecryption.js';
-import { TextCrypto } from './utils/TextCrypto';
+import { decryptImage, decryptText } from "./utils/crypto";
 import { QRCodeUtils } from './utils/QRCodeUtils';
 
 // 确保基础环境兼容
@@ -37,7 +36,7 @@ export default class SyncPlugin extends Plugin {
     private lastSyncTime: number = 0;
 
     showMessage = (msg: string) => {
-        showMessage(`微信同步插件[${VERSION}]: ` + msg);
+        showMessage(`微信同步插件[${VERSION}]: ${msg}`);
     }
 
     async onload() {
@@ -555,33 +554,6 @@ export default class SyncPlugin extends Plugin {
         }
     }
 
-    /**
-     * 解密数据
-     * @param encryptedText Base64编码的加密文本
-     * @returns 解密后的文本
-     */
-    private async decryptData(encryptedText: string): Promise<string> {
-        if (!this.config.saltValue || this.config.saltValue.length < 48) {
-            // 确保盐值已正确加载
-            const savedConfig = await this.loadData("config.json");
-            if (savedConfig && savedConfig.saltValue && savedConfig.saltValue.length >= 48) {
-                this.config.saltValue = savedConfig.saltValue;
-                console.log('已从配置文件重新加载盐值:', this.config.saltValue);
-            } else {
-                throw new Error('无效的加密盐值');
-            }
-        }
-
-        try {
-            // 使用小程序端兼容的解密方法
-            console.log('解密使用的当前盐值:', this.config.saltValue);
-            return TextCrypto.decryptText(encryptedText, this.config.saltValue);
-        } catch (error) {
-            console.error('解密失败:', error);
-            throw error;
-        }
-    }
-
     private async writeDataToDoc(note: NotePushBackendapiNoteV1RecordRes) {
         const timeInstance = new Date(note.createdAt);
         const timestamp = timeInstance.getTime();
@@ -603,10 +575,9 @@ export default class SyncPlugin extends Plugin {
             console.log(`时间差： ${diifTime}`)
 
             let processedData = data;
-            if (this.config.saltValue && note.contentType == 'secretText') {
+            if (this.config.saltValue && note.contentType === 'secretText') {
                 try {
-                    processedData = await this.decryptData(data);
-                    console.log('数据解密成功',processedData);
+                    processedData = await decryptText(data, this.config.saltValue);
                 } catch (decryptError) {
                     processedData = data; // 解密失败，使用原始数据
                     this.showMessage(`解密数据失败: ${decryptError.message}`);
@@ -644,66 +615,36 @@ export default class SyncPlugin extends Plugin {
                     console.error('处理图片失败:', error);
                     processedData = `图片处理失败: ${error.message}`;
                 }
-            } else if (note.contentType == 'secretImage') {
+            } else if (note.contentType === 'secretImage') {
                 try {
                     const imageData = await this.syncApi.getImageContent(data);
-                    const encryptedContent = await this.blobToText(imageData.content);
-                    try {
-                        let jsonData;
-                        try {
-                            jsonData = JSON.parse(encryptedContent);
-                        } catch (e) {
-                            console.warn('JSON解析失败，尝试直接解密:', e);
-                            jsonData = { data: encryptedContent };
-                        }
-                        const decryptedData = await this.decryptImageData(jsonData, this.config.saltValue);
-                        const imageBlob = this.base64ToBlob(
-                            decryptedData.data,
-                            `image/${decryptedData.extension|| 'jpeg'}`
-                        );
-                        const formData = new FormData();
-                        formData.append('file[]', imageBlob, imageData.name);
 
-                        const uploadResponse = await fetch('/api/asset/upload', {
-                            method: 'POST',
-                            body: formData
-                        });
+                    // 使用 decryptImage 函数解密图片
+                    const imageBlob = await decryptImage(imageData.content, this.config.saltValue);
 
-                        if (!uploadResponse.ok) {
-                            throw new Error(`上传解密图片失败: ${uploadResponse.status}`);
-                        }
+                    // 上传解密后的图片
+                    const formData = new FormData();
+                    formData.append('file[]', imageBlob, imageData.name);
 
-                        const uploadResult = await uploadResponse.json();
-                        if (uploadResult.code !== 0) {
-                            throw new Error(`上传解密图片失败: ${uploadResult.msg}`);
-                        }
-                        const assetPath = uploadResult.data.succMap[Object.keys(uploadResult.data.succMap)[0]];
-                        processedData = `![image](${assetPath})`;
-                        console.log('加密图片处理成功');
-                    } catch (decryptError) {
-                        console.error('解密图片失败:', decryptError);
+                    const uploadResponse = await fetch('/api/asset/upload', {
+                        method: 'POST',
+                        body: formData
+                    });
 
-                        // 解密失败时，上传原始图片并添加提示
-                        const formData = new FormData();
-                        formData.append('file[]', imageData.content, imageData.name);
-
-                        const uploadResponse = await fetch('/api/asset/upload', {
-                            method: 'POST',
-                            body: formData
-                        });
-
-                        if (!uploadResponse.ok) {
-                            throw new Error(`上传原始加密图片失败: ${uploadResponse.status}`);
-                        }
-
-                        const uploadResult = await uploadResponse.json();
-                        const assetPath = uploadResult.data.succMap[Object.keys(uploadResult.data.succMap)[0]];
-                        processedData = `![image](${assetPath})
-
-> 注意：此图片是加密图片，但解密失败，显示的是原始加密图片。错误: ${decryptError.message}`;
+                    if (!uploadResponse.ok) {
+                        throw new Error(`上传解密图片失败: ${uploadResponse.status}`);
                     }
+
+                    const uploadResult = await uploadResponse.json();
+                    if (uploadResult.code !== 0) {
+                        throw new Error(`上传解密图片失败: ${uploadResult.msg}`);
+                    }
+
+                    const assetPath = uploadResult.data.succMap[Object.keys(uploadResult.data.succMap)[0]];
+                    processedData = `![image](${assetPath})`;
+                    console.log('加密图片处理成功');
                 } catch (error) {
-                    console.error('处理加密图片最终失败:', error);
+                    console.error('处理加密图片失败:', error);
                     processedData = `加密图片处理失败: ${error.message}`;
                 }
             } else if (note.contentType === 'link') {
@@ -726,7 +667,7 @@ export default class SyncPlugin extends Plugin {
                 data = `<span data-type="block-ref" data-subtype="d" data-id="${doc.data}">${content.title}</span>`;
             }
 
-            if (this.lastSyncTime == 0 || timestamp - this.lastSyncTime > 300 * 1000) {
+            if (this.lastSyncTime === 0 || timestamp - this.lastSyncTime > 300 * 1000) {
                 this.lastSyncTime = timestamp;
                 await this.saveData("syncTime.json", this.lastSyncTime)
 
@@ -782,47 +723,5 @@ export default class SyncPlugin extends Plugin {
             "扫描二维码获取Token",
             "Token二维码.png"
         );
-    }
-
-    /**
-     * 将Blob对象转换为文本
-     * @param blob Blob数据
-     * @returns 文本内容
-     */
-    private async blobToText(blob: Blob): Promise<string> {
-        return TextCrypto.blobToText(blob);
-    }
-
-    /**
-     * 将Base64字符串转换为Blob对象
-     * @param base64 Base64编码的字符串
-     * @param mimeType MIME类型
-     * @returns Blob对象
-     */
-    private base64ToBlob(base64: string, mimeType: string): Blob {
-        return TextCrypto.base64ToBlob(base64, mimeType);
-    }
-
-    /**
-     * 解密图片数据
-     * @param encryptedData 加密的图片数据对象
-     * @param salt 解密用的盐值
-     * @returns 解密后的图片数据
-     */
-    private async decryptImageData(encryptedData: any, salt: string): Promise<any> {
-        if (!encryptedData) {
-            throw new Error('无效的加密图片数据格式');
-        }
-
-        if (!salt || salt.length < 48) {
-            throw new Error('无效的解密盐值');
-        }
-
-        try {
-            return decryptImage(encryptedData, salt);
-        } catch (error) {
-            console.error('图片解密失败:', error);
-            throw new Error(`图片解密处理失败: ${error.message}`);
-        }
     }
 }
