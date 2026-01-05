@@ -84,15 +84,15 @@ export class QRCodeUtils {
         try {
             // 清空容器
             container.innerHTML = '';
-            
+
             // 创建canvas并生成二维码
             const canvas = document.createElement('canvas');
             canvas.width = 256;
             canvas.height = 256;
             canvas.style.borderRadius = '4px';
             container.appendChild(canvas);
-            
-            QRCode.toCanvas(canvas, text, { 
+
+            QRCode.toCanvas(canvas, text, {
                 margin: 4,
                 errorCorrectionLevel: 'H',
                 color: {
@@ -111,7 +111,7 @@ export class QRCodeUtils {
                     hint.style.color = 'var(--b3-theme-on-surface)';
                     hint.textContent = hintText;
                     container.appendChild(hint);
-                    
+
                     // 添加下载按钮
                     const downloadLink = document.createElement('a');
                     downloadLink.style.display = 'block';
@@ -143,19 +143,19 @@ export class QRCodeUtils {
         try {
             // 清空容器
             container.innerHTML = '';
-            
+
             // 使用toDataURL方法生成图片URL
-            QRCode.toDataURL(text, { 
+            QRCode.toDataURL(text, {
                 width: 256,
                 margin: 4,
-                errorCorrectionLevel: 'H' 
+                errorCorrectionLevel: 'H'
             }, (err, url) => {
                 if (err) {
                     console.error('无法生成二维码URL:', err);
                     container.innerHTML = `<div style="color:red">生成二维码失败</div>`;
                     return;
                 }
-                
+
                 // 创建图片元素
                 const img = document.createElement('img');
                 img.src = url;
@@ -163,7 +163,7 @@ export class QRCodeUtils {
                 img.height = 256;
                 img.style.borderRadius = '4px';
                 container.appendChild(img);
-                
+
                 // 添加提示文字
                 const hint = document.createElement('div');
                 hint.style.marginTop = '10px';
@@ -171,7 +171,7 @@ export class QRCodeUtils {
                 hint.style.color = 'var(--b3-theme-on-surface)';
                 hint.textContent = hintText;
                 container.appendChild(hint);
-                
+
                 // 添加下载按钮
                 const downloadLink = document.createElement('a');
                 downloadLink.style.display = 'block';
@@ -195,12 +195,12 @@ export class QRCodeUtils {
      * @param length 盐值长度，默认48位（16位IV + 32位密钥）
      * @returns 生成的随机盐值
      */
-    static generateSecureSalt(length: number = 48): string {
+    static generateSecureSalt(length: number = 32): string {
         try {
             // 生成指定长度的随机盐值
             let randomString = '';
             const array = new Uint8Array(Math.ceil(length / 2));
-            
+
             // 优先使用Web Crypto API（更安全）
             if (typeof window !== 'undefined' && window.crypto && window.crypto.getRandomValues) {
                 window.crypto.getRandomValues(array);
@@ -213,7 +213,7 @@ export class QRCodeUtils {
                     randomString += "0123456789abcdef"[Math.floor(Math.random() * 16)];
                 }
             }
-            
+
             // 截断或填充到指定长度
             if (randomString.length > length) {
                 randomString = randomString.substring(0, length);
@@ -223,11 +223,11 @@ export class QRCodeUtils {
                     randomString += "0123456789abcdef"[Math.floor(Math.random() * 16)];
                 }
             }
-            
+
             return randomString;
         } catch (error) {
             console.error('生成安全随机盐值失败:', error);
-            
+
             // 备用方法（如果上面的方法失败）
             let backup = '';
             for (let i = 0; i < length; i++) {
@@ -238,4 +238,4 @@ export class QRCodeUtils {
     }
 }
 
-export default QRCodeUtils; 
+export default QRCodeUtils;

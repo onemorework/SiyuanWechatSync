@@ -169,14 +169,13 @@ export default class SyncPlugin extends Plugin {
             title: "同步周期（秒）",
             value: this.config.syncInterval,
             description: "自动同步的时间间隔（0表示不自动同步）",
-            action: {
-                callback: async () => {
-                    const newInterval = this.settingUtils.take("syncInterval", true);
-                    this.config.syncInterval = newInterval;
-                    await this.saveData("config.json", this.config);
-                    this.startSyncTimer();
-                }
-            }
+            getEleVal: (ele: HTMLInputElement) => {
+                console.log(`获取同步周期值: 输入值为 [${ele.value}]`);
+                const val = parseInt(ele.value, 10);
+                this.config.syncInterval = val;
+                this.startSyncTimer();
+                return val;
+            },
         });
 
         this.settingUtils.addItem({
@@ -331,9 +330,9 @@ export default class SyncPlugin extends Plugin {
         this.settingUtils.addItem({
             key: "saltValue",
             type: "custom",
-            title: "AES-GCM-256加密盐值",
+            title: "AES-128-CBC 加密盐值",
             value: this.config.saltValue,
-            description: "加密用的盐值（48位或更长，前16位为iv，后面为密钥）",
+            description: "加密用的盐值",
             createElement: () => {
                 const container = document.createElement('div');
                 container.className = 'salt-value-container';
@@ -352,7 +351,7 @@ export default class SyncPlugin extends Plugin {
                 input.className = 'b3-text-field fn__flex-center';
                 // 确保始终使用最新的配置值
                 input.value = this.config.saltValue || '';
-                input.placeholder = '请输入盐值（至少48位）';
+                input.placeholder = '请输入盐值(至少32位)';
                 input.style.flex = '1';
 
                 // 添加输入监听器，确保实时更新配置
@@ -401,7 +400,7 @@ export default class SyncPlugin extends Plugin {
                         });
                     } catch (error) {
                         console.error('生成盐值失败:', error);
-                        this.showMessage("生成盐值失败: " + error.message);
+                        this.showMessage(`生成盐值失败: ${error.message}`);
                     }
                 };
 
@@ -429,8 +428,8 @@ export default class SyncPlugin extends Plugin {
                         this.showMessage("请先输入或生成盐值");
                         return;
                     }
-                    if (input.value.trim().length < 48) {
-                        this.showMessage("盐值长度不足，请确保盐值至少48位");
+                    if (input.value.trim().length < 32) {
+                        this.showMessage("盐值长度不足，请确保盐值至少32位");
                         return;
                     }
                     this.showSaltQRCode(input.value);
@@ -491,6 +490,7 @@ export default class SyncPlugin extends Plugin {
         if (this.syncTimer) {
             clearInterval(this.syncTimer);
             this.syncTimer = null;
+            console.log('清除旧的定时器');
         }
 
         if (this.config.token === "") {
@@ -498,14 +498,20 @@ export default class SyncPlugin extends Plugin {
             return;
         };
 
-        if (this.config.syncInterval <= 0) {
-            console.log('sync interval is 0, skip sync');
+        const interval = Number(this.config.syncInterval);
+        console.log(`准备启动定时器, 同步周期: ${interval} 秒`);
+
+        if (!interval || interval <= 0) {
+            console.log('sync interval is 0 or invalid, skip sync');
             return
         }
 
         this.syncTimer = setInterval(() => {
+            console.log('定时器触发, 开始同步...');
             this.syncData();
-        }, this.config.syncInterval * 1000);
+        }, interval * 1000);
+
+        console.log(`定时器已启动, 将每 ${interval} 秒同步一次`);
     }
 
 
@@ -664,7 +670,7 @@ export default class SyncPlugin extends Plugin {
                     id: doc.data,
                 })
 
-                data = `<span data-type="block-ref" data-subtype="d" data-id="${doc.data}">${content.title}</span>`;
+                processedData = `<span data-type="block-ref" data-subtype="d" data-id="${doc.data}">${content.title}</span>`;
             }
 
             if (this.lastSyncTime === 0 || timestamp - this.lastSyncTime > 300 * 1000) {
