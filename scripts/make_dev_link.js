@@ -4,11 +4,16 @@
  * @Date         : 2023-07-15 15:31:31
  * @FilePath     : /scripts/make_dev_link.js
  * @LastEditTime : 2024-09-06 18:13:53
- * @Description  : 
+ * @Description  :
  */
 // make_dev_link.js
+
+import dotenv from 'dotenv';
 import fs from 'fs';
-import { log, error, getSiYuanDir, chooseTarget, getThisPluginName, makeSymbolicLink } from './utils.js';
+import { chooseTarget, error, getSiYuanDir, getThisPluginName, log, makeSymbolicLink } from './utils.js';
+
+// Load environment variables from .env file
+dotenv.config();
 
 let targetDir = '';
 

@@ -1,5 +1,6 @@
+import type { AxiosInstance } from 'axios';
+import axios from 'axios';
 import { SERVER_BASE_URL } from "../config";
-import axios, { AxiosInstance } from 'axios';
 
 export default class ServerAPI {
   private request: AxiosInstance;
@@ -31,11 +32,11 @@ export default class ServerAPI {
 
         if (error.response) {
           const code = error.response.status
-          if (code == 400) {
+          if (code === 400) {
             return Promise.reject(error.response.data.message)
           }
 
-          if (error.response.status == 401) {
+          if (error.response.status === 401) {
             return Promise.reject("Token 校验失败, 请重新配置")
           }
         }
