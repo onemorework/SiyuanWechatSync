@@ -2,9 +2,13 @@
 
 [English](./README_en_US.md)
 
-一个用于将微信公众号（云笔记助手）的内容同步保存到思源笔记的插件。
+通过微信同步数据保存到思源笔记。
 
+微信服务号:
 <img src="https://fastly.jsdelivr.net/gh/onemorework/SiyuanWechatSync/asset/wechat_qr.png" alt="weichat" width="300"/>
+
+微信小程序:
+<img src="https://fastly.jsdelivr.net/gh/onemorework/SiyuanWechatSync/asset/miniprogram_qr.png" alt="miniprogram" width="300"/>
 
 ## 隐私安全说明
 
