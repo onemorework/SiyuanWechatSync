@@ -1,20 +1,21 @@
 # 思源笔记微信同步插件
 
-[English](./README_en_US.md)
-
 通过微信同步数据保存到思源笔记。
 
 微信服务号:
+
 <img src="https://fastly.jsdelivr.net/gh/onemorework/SiyuanWechatSync/asset/wechat_qr.png" alt="weichat" width="300"/>
 
 微信小程序:
-<img src="https://fastly.jsdelivr.net/gh/onemorework/SiyuanWechatSync/asset/miniprogram_qr.png" alt="miniprogram" width="300"/>
+
+<img src="https://fastly.jsdelivr.net/gh/onemorework/SiyuanWechatSync@master/asset/miniprogram_qr.png" alt="miniprogram" width="120"/>
+
 
 ## 隐私安全说明
 
-**由于当前微信公众号的机制，所有消息在公众号后台均可查阅，我们承诺不会主动浏览任何信息并会定期删除用户对话数据，但为了您的隐私安全，请勿发送敏感数据。**
+**由于当前微信公众号的机制，直接发送给服务号的消息在后台均可查阅，我们承诺不会主动浏览任何信息并会定期删除用户对话数据**
 
-**重要补充：本插件支持文本和图片加密功能，您可以设置加密盐值，内容将使用加密方式传输和存储，为您的数据提供额外的安全保障。**
+**为了您的隐私安全，敏感数据建议使用小程序发送，小程序将基于您设置的加密盐值，通过点对点加密方式传输和存储，为您的数据提供额外的安全保障**
 
 ## 功能特点
 
@@ -82,7 +83,8 @@
 
 如果你在使用过程中遇到任何问题，或有任何建议，欢迎通过以下方式反馈：
 
-1. 在云笔记助手公众号中发送"!反馈"进入反馈页面
+1. 在小程序发送页面底部点击问题反馈联络客服
+2. 在云笔记助手公众号中发送"!反馈"进入反馈页面
 2. 在 GitHub 上提交 [Issue](https://github.com/onemorework/SiyuanWechatSync/issues)
 
 ## 开源协议
