@@ -91,4 +91,8 @@ export default class ServerAPI {
   async getLinkContent(noteId: string): Promise<NoteLinkContentRes> {
     return await this.request.get(`/api/v1/note/links/${noteId}`).then((res) => res.data);
   }
+
+  async getQuota(): Promise<UserQuotaRes> {
+    return await this.request.get('/api/v1/user/quota').then((res) => res.data);
+  }
 }

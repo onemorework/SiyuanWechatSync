@@ -38,3 +38,17 @@ interface NoteLinkContentRes {
   title?: string;
   [property: string]: any;
 }
+
+interface QuotaInfo {
+  used?: number;
+  limit?: number;
+  [property: string]: any;
+}
+
+interface UserQuotaRes {
+  userId?: string;
+  paidExpiresAt?: string;
+  noteQuota?: QuotaInfo;
+  linkQuota?: QuotaInfo;
+  [property: string]: any;
+}

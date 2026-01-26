@@ -1,7 +1,7 @@
 import { Client } from "@siyuan-community/siyuan-sdk";
 import { fetchPost, Plugin, showMessage } from "siyuan";
 import ServerAPI from './apis/server-api';
-import { VERSION } from './config';
+import { PAYMENT_URL, VERSION } from './config';
 import { ICONS } from './icons';
 import { SettingUtils } from "./libs/setting-utils";
 import { decryptImage, decryptText } from "./utils/crypto";
@@ -116,6 +116,67 @@ export default class SyncPlugin extends Plugin {
                 buttonContainer.style.width = '100%';
                 buttonContainer.style.maxWidth = '240px';
 
+                // 检测按钮
+                const checkButton = document.createElement('button');
+                checkButton.className = 'b3-button b3-button--outline';
+                checkButton.style.display = 'flex';
+                checkButton.style.alignItems = 'center';
+                checkButton.style.justifyContent = 'center';
+                checkButton.style.gap = '8px';
+                checkButton.style.padding = '4px 12px';
+                checkButton.title = "检测Token是否有效";
+                checkButton.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    <span>检测</span>
+                `;
+                checkButton.onclick = async (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const tokenValue = input.value.trim();
+                    if (!tokenValue) {
+                        this.showMessage("请先输入Token再进行检测");
+                        return;
+                    }
+
+                    // 临时保存原始token
+                    const originalToken = this.config.token;
+
+                    try {
+                        checkButton.disabled = true;
+                        checkButton.querySelector('span').textContent = '检测中...';
+
+                        // 先用输入的token检测API是否可用
+                        this.config.token = tokenValue;
+                        this.syncApi.updateToken(tokenValue);
+
+                        // 调用API检测token是否有效
+                        await this.syncApi.getQuota();
+
+                        // 检测成功，保存token配置
+                        await this.saveData("config.json", this.config);
+
+                        // 触发额度信息栏更新
+                        if (quotaLoadFunction) {
+                            await quotaLoadFunction();
+                        }
+                        this.showMessage("获取用户信息成功");
+
+                    } catch (error) {
+                        console.error('Token检测失败:', error);
+                        this.showMessage(error);
+
+                        // 恢复原始token状态
+                        this.config.token = originalToken;
+                        this.syncApi.updateToken(originalToken);
+                        await this.saveData("config.json", this.config);
+                    } finally {
+                        checkButton.disabled = false;
+                        checkButton.querySelector('span').textContent = '检测';
+                    }
+                };
+
                 const qrButton = document.createElement('button');
                 qrButton.className = 'b3-button b3-button--outline';
                 qrButton.style.display = 'flex';
@@ -145,6 +206,7 @@ export default class SyncPlugin extends Plugin {
                 };
 
                 inputContainer.appendChild(input);
+                buttonContainer.appendChild(checkButton);
                 buttonContainer.appendChild(qrButton);
                 container.appendChild(inputContainer);
                 container.appendChild(buttonContainer);
@@ -467,6 +529,376 @@ export default class SyncPlugin extends Plugin {
                     }
                 }
             }
+        });
+
+        // 保存额度信息加载函数的引用，供token检测使用
+        let quotaLoadFunction: (() => Promise<void>) | null = null;
+
+        this.settingUtils.addItem({
+            key: "quotaInfo",
+            type: "custom",
+            title: "额度信息",
+            value: "",
+            description: "",
+            createElement: () => {
+                const container = document.createElement('div');
+                container.className = 'quota-info-container';
+
+                const quotaSection = document.createElement('div');
+                quotaSection.className = 'quota-section';
+
+                // 用户信息
+                const userInfoItem = document.createElement('div');
+                userInfoItem.className = 'quota-item';
+                userInfoItem.innerHTML = `
+                    <div class="quota-label">
+                        <svg class="quota-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="12" cy="7" r="4"></circle>
+                        </svg>
+                        用户信息
+                    </div>
+                    <div class="quota-content">
+                        <span class="user-type" id="userType">-</span>
+                        <div class="expiry" id="expiryContainer" style="display: none;">
+                            <span class="expiry-label">过期时间:</span>
+                            <span class="expiry-date" id="expiryDate">-</span>
+                        </div>
+                    </div>
+                `;
+
+                // 笔记剪藏额度
+                const noteQuotaItem = document.createElement('div');
+                noteQuotaItem.className = 'quota-item';
+                noteQuotaItem.innerHTML = `
+                    <div class="quota-label">
+                        <svg class="quota-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14,2 14,8 20,8"></polyline>
+                            <line x1="16" y1="13" x2="8" y2="13"></line>
+                            <line x1="16" y1="17" x2="8" y2="17"></line>
+                            <polyline points="10,9 9,9 8,9"></polyline>
+                        </svg>
+                        笔记剪藏额度
+                    </div>
+                    <div class="quota-content">
+                        <span class="quota-used" id="noteQuotaUsed">-</span>
+                        <span class="quota-total" id="noteQuotaTotal">/ -</span>
+                    </div>
+                `;
+
+                // 链接剪藏额度
+                const linkQuotaItem = document.createElement('div');
+                linkQuotaItem.className = 'quota-item';
+                linkQuotaItem.innerHTML = `
+                    <div class="quota-label">
+                        <svg class="quota-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                        </svg>
+                        链接剪藏额度
+                    </div>
+                    <div class="quota-content" style="position: relative;">
+                        <span class="quota-used" id="linkQuotaUsed">-</span>
+                        <span class="quota-total" id="linkQuotaTotal">/ -</span>
+                        <button class="refresh-button" id="refreshQuota" title="刷新额度信息" disabled>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="23 4 23 10 17 10"></polyline>
+                                <polyline points="1 20 1 14 7 14"></polyline>
+                                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                            </svg>
+                        </button>
+                    </div>
+                `;
+
+                quotaSection.appendChild(userInfoItem);
+                quotaSection.appendChild(noteQuotaItem);
+                quotaSection.appendChild(linkQuotaItem);
+                container.appendChild(quotaSection);
+
+                // 购买会员链接
+                const purchaseLink = document.createElement('a');
+                purchaseLink.href = '#';
+                purchaseLink.target = '_blank';
+                purchaseLink.className = 'purchase-link';
+                purchaseLink.textContent = '购买会员';
+                purchaseLink.title = '点击购买会员';
+                purchaseLink.style.display = 'inline-block';
+                purchaseLink.style.cursor = 'not-allowed';
+                purchaseLink.style.opacity = '0.5';
+                purchaseLink.style.pointerEvents = 'none';
+                container.appendChild(purchaseLink);
+
+                // 添加样式
+                const style = document.createElement('style');
+                style.textContent = `
+                    .quota-info-container {
+                        width: 100%;
+                    }
+                    .quota-section {
+                        display: grid;
+                        grid-template-columns: 1fr;
+                        gap: 16px;
+                        background-color: #f9fafb;
+                        padding: 16px;
+                        border-radius: 12px;
+                        border: 1px solid #e5e7eb;
+                        margin-top: 8px;
+                    }
+                    @media (min-width: 768px) {
+                        .quota-section {
+                            grid-template-columns: repeat(3, 1fr);
+                        }
+                    }
+                    .quota-item {
+                        display: flex;
+                        flex-direction: column;
+                        gap: 8px;
+                    }
+                    .quota-item:not(:last-child) {
+                        border-right: 1px solid #d1d5db;
+                        padding-right: 16px;
+                    }
+                    @media (max-width: 767px) {
+                        .quota-item:not(:last-child) {
+                            border-right: none;
+                            border-bottom: 1px solid #d1d5db;
+                            padding-right: 0;
+                            padding-bottom: 12px;
+                        }
+                    }
+                    .quota-label {
+                        display: flex;
+                        align-items: center;
+                        gap: 6px;
+                        font-size: 12px;
+                        font-weight: 500;
+                        color: #6b7280;
+                    }
+                    .quota-icon {
+                        width: 16px;
+                        height: 16px;
+                        color: #3b82f6;
+                    }
+                    .quota-content {
+                        display: flex;
+                        align-items: center;
+                        gap: 8px;
+                        flex-wrap: wrap;
+                    }
+                    .user-type {
+                        padding: 2px 8px;
+                        border-radius: 9999px;
+                        background-color: #dbeafe;
+                        color: #1d4ed8;
+                        font-size: 11px;
+                        font-weight: 600;
+                        border: 1px solid #bfdbfe;
+                    }
+                    .expiry {
+                        display: flex;
+                        align-items: center;
+                        gap: 4px;
+                    }
+                    .expiry-label {
+                        font-size: 11px;
+                        color: #9ca3af;
+                        font-weight: 500;
+                    }
+                    .expiry-date {
+                        font-size: 13px;
+                        font-weight: 600;
+                        color: #374151;
+                    }
+                    .quota-used {
+                        font-size: 16px;
+                        font-weight: 600;
+                        color: #374151;
+                    }
+                    .quota-total {
+                        font-size: 12px;
+                        color: #9ca3af;
+                        font-weight: normal;
+                    }
+                    .refresh-button {
+                        position: absolute;
+                        right: 0;
+                        top: 50%;
+                        transform: translateY(-50%);
+                        background: none;
+                        border: none;
+                        cursor: pointer;
+                        padding: 4px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        color: #9ca3af;
+                        transition: color 0.2s;
+                    }
+                    .refresh-button:hover {
+                        color: #3b82f6;
+                    }
+                    .refresh-button:active {
+                        transform: translateY(-50%) rotate(180deg);
+                        transition: transform 0.3s;
+                    }
+                    .refresh-button:disabled {
+                        cursor: not-allowed;
+                        opacity: 0.4;
+                    }
+                    .refresh-button:disabled:hover {
+                        color: #9ca3af;
+                    }
+                    .purchase-link {
+                        display: inline-block;
+                        text-align: left;
+                        margin-top: 16px;
+                        color: #3b82f6;
+                        text-decoration: none;
+                        font-size: 13px;
+                        font-weight: 500;
+                        transition: color 0.2s, opacity 0.2s;
+                        cursor: pointer;
+                    }
+                    .purchase-link:disabled {
+                        cursor: not-allowed;
+                        opacity: 0.5;
+                        pointer-events: none;
+                    }
+                    .purchase-link:hover {
+                        color: #2563eb;
+                        text-decoration: underline;
+                    }
+                    .purchase-link:disabled:hover {
+                        color: #3b82f6;
+                        text-decoration: none;
+                    }
+                `;
+                container.appendChild(style);
+
+                // 更新刷新按钮状态
+                const updateRefreshButton = () => {
+                    const refreshButton = container.querySelector('#refreshQuota') as HTMLButtonElement;
+                    if (refreshButton) {
+                        const hasToken = this.config.token && this.config.token.trim() !== '';
+                        refreshButton.disabled = !hasToken;
+                    }
+                };
+
+                // 加载额度数据
+                const loadQuota = async () => {
+                    quotaLoadFunction = loadQuota; // 保存函数引用
+                    try {
+                        // 检查token是否存在
+                        if (!this.config.token || this.config.token.trim() === '') {
+                            updateRefreshButton();
+                            // 禁用购买会员链接
+                            if (purchaseLink) {
+                                purchaseLink.href = '#';
+                                purchaseLink.classList.add('disabled');
+                                purchaseLink.style.cursor = 'not-allowed';
+                                purchaseLink.style.opacity = '0.5';
+                                purchaseLink.style.pointerEvents = 'none';
+                            }
+                            return;
+                        }
+
+                        const quotaData = await this.syncApi.getQuota();
+
+                        // 更新用户类型
+                        const userTypeEl = container.querySelector('#userType') as HTMLElement;
+                        const expiryContainerEl = container.querySelector('#expiryContainer') as HTMLElement;
+                        if (userTypeEl) {
+                            const isPaid = quotaData.paidExpiresAt && new Date(quotaData.paidExpiresAt) > new Date();
+                            userTypeEl.textContent = isPaid ? '付费用户' : '免费用户';
+                            if (!isPaid) {
+                                userTypeEl.style.backgroundColor = '#f3f4f6';
+                                userTypeEl.style.color = '#6b7280';
+                                userTypeEl.style.borderColor = '#e5e7eb';
+                                // 隐藏过期时间
+                                if (expiryContainerEl) {
+                                    expiryContainerEl.style.display = 'none';
+                                }
+                            } else {
+                                // 显示过期时间
+                                if (expiryContainerEl) {
+                                    expiryContainerEl.style.display = 'flex';
+                                }
+                            }
+                        }
+
+                        // 更新过期时间
+                        const expiryDateEl = container.querySelector('#expiryDate');
+                        if (expiryDateEl && quotaData.paidExpiresAt) {
+                            const date = new Date(quotaData.paidExpiresAt);
+                            expiryDateEl.textContent = date.toLocaleDateString('zh-CN');
+                        }
+
+                        // 更新笔记额度
+                        const noteQuotaUsedEl = container.querySelector('#noteQuotaUsed');
+                        const noteQuotaTotalEl = container.querySelector('#noteQuotaTotal');
+                        if (noteQuotaUsedEl && quotaData.noteQuota) {
+                            noteQuotaUsedEl.textContent = quotaData.noteQuota.used?.toString() || '0';
+                        }
+                        if (noteQuotaTotalEl && quotaData.noteQuota) {
+                            noteQuotaTotalEl.textContent = `/ ${quotaData.noteQuota.limit?.toString() || '∞'}`;
+                        }
+
+                        // 更新链接额度
+                        const linkQuotaUsedEl = container.querySelector('#linkQuotaUsed');
+                        const linkQuotaTotalEl = container.querySelector('#linkQuotaTotal');
+                        if (linkQuotaUsedEl && quotaData.linkQuota) {
+                            linkQuotaUsedEl.textContent = quotaData.linkQuota.used?.toString() || '0';
+                        }
+                        if (linkQuotaTotalEl && quotaData.linkQuota) {
+                            linkQuotaTotalEl.textContent = `/ ${quotaData.linkQuota.limit?.toString() || '∞'}`;
+                        }
+                        updateRefreshButton();
+
+                        // 启用购买会员链接并设置URL
+                        if (purchaseLink && quotaData.userId) {
+                            purchaseLink.href = `${PAYMENT_URL}?userId=${quotaData.userId}`;
+                            purchaseLink.classList.remove('disabled');
+                            purchaseLink.style.cursor = 'pointer';
+                            purchaseLink.style.opacity = '1';
+                            purchaseLink.style.pointerEvents = 'auto';
+                        }
+                    } catch (error) {
+                        console.error('获取额度信息失败:', error);
+                        const userTypeEl = container.querySelector('#userType') as HTMLElement;
+                        if (userTypeEl) {
+                            userTypeEl.textContent = '获取失败';
+                            userTypeEl.style.backgroundColor = '#fee2e2';
+                            userTypeEl.style.color = '#dc2626';
+                            userTypeEl.style.borderColor = '#fecaca';
+                        }
+                        updateRefreshButton();
+                        // 禁用购买会员链接
+                        if (purchaseLink) {
+                            purchaseLink.href = '#';
+                            purchaseLink.classList.add('disabled');
+                            purchaseLink.style.cursor = 'not-allowed';
+                            purchaseLink.style.opacity = '0.5';
+                            purchaseLink.style.pointerEvents = 'none';
+                        }
+                    }
+                };
+
+                // 初始加载
+                loadQuota();
+
+                // 绑定刷新按钮
+                const refreshButton = container.querySelector('#refreshQuota') as HTMLButtonElement;
+                if (refreshButton) {
+                    refreshButton.addEventListener('click', () => {
+                        loadQuota();
+                    });
+                }
+
+                return container;
+            },
+            getEleVal: () => '',
+            setEleVal: () => {},
         });
 
         this.addTopBar({
